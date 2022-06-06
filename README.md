@@ -45,6 +45,27 @@ query {
 }
 ```
 
+### Getting Started
+
+```ruby
+# Gemfile
+gem 'graphiti'
+gem "graphiti-rails"
+gem 'graphiti_gql'
+```
+
+```ruby
+# config/routes.rb
+
+Rails.application.routes.draw do
+  scope path: ApplicationResource.endpoint_namespace do
+    mount GraphitiGql::Engine, at: "/gql"
+  end
+end
+```
+
+Write your Graphiti code as normal, omit controllers.
+
 ### How does it work?
 
 This autogenerates `graphql-ruby` code by introspecting Graphiti Resources. Something like this happens under-the-hood:
