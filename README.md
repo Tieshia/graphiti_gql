@@ -82,3 +82,9 @@ end
 ```
 
 In practice it's more complicated, but this is the basic premise - use Graphiti resources to handle query and persistence operations; autogenerate `graphql-ruby` code to expose those Resources as an API. This means we play nicely with e.g. telemetry and error-handling libraries because it's all `graphql-ruby` under-the-hood...except for actually **performing** the operations, which is really more a Ruby thing than a GraphQL thing.
+
+### Caveats
+
+This rethinks the responsibilities of Graphiti, coupling the execution cycle to `graphql-ruby`. We do this so we can play nicely with other gems in the GQL ecosystem, and saves on development time by offloading responsibilities. The downside is we can no longer run a `JSON:API` with the same codebase, and certain documentation may be out of date.
+
+Longer-term, we should rip out only the parts of Graphiti we really need and redocument.
