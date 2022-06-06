@@ -46,3 +46,18 @@ query {
 ```
 
 ### How does it work?
+
+This autogenerates `graphql-ruby` code by introspecting Graphiti Resources. Something like this happens under-the-hood:
+
+```ruby
+field :employees, [EmployeeType], null: false do
+  argument :filter, EmployeeFilter, required: false
+  # ... etc ...
+end
+
+def employees(**arguments)
+  EmployeeResource.all(**arguments).to_a
+end
+```
+
+In practice it's more complicated, but this is the basic premise - use Graphiti resources to handle query and persistence operations; autogenerate `graphql-ruby` code to expose those Resources as an API. This means we play nicely with e.g. telemetry and error-handling libraries because it's all `graphql-ruby` under-the-hood...except for actually **performing** the operations, which is really more a Ruby thing than a GraphQL thing.
