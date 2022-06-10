@@ -1134,6 +1134,9 @@ RSpec.describe GraphitiGql do
           json = run(%|
             query {
               employees(first: 2) {
+                nodes {
+                  id
+                }
                 pageInfo {
                   hasNextPage
                   hasPreviousPage
@@ -3981,6 +3984,216 @@ RSpec.describe GraphitiGql do
             GraphitiGql::Errors::UnauthorizedField,
             'You are not authorized to read field employees.nodes.0.firstName'
           )
+        end
+      end
+    end
+
+    describe "when using alias_attribute" do
+      before do
+        resource.attribute :name, :string, alias: :first_name
+        schema!
+      end
+
+      def names(json)
+        json[:employees][:nodes].map { |n| n[:name] }
+      end
+
+      it "renders correctly" do
+        json = run(%|
+          query {
+            employees {
+              nodes {
+                name
+              }
+            }
+          }
+        |)
+        expect(names(json)).to eq(%w(Stephen Agatha))
+      end
+
+      context "when customizing rendering" do
+        before do
+          resource.attribute :name, :string, alias: :first_name do
+            object.first_name.upcase
+          end
+          schema!
+        end
+
+        it "is respected" do
+          json = run(%|
+            query {
+              employees {
+                nodes {
+                  name
+                }
+              }
+            }
+          |)
+          expect(names(json)).to eq(%w(STEPHEN AGATHA))
+        end
+      end
+
+      it "sorts correctly" do
+        json = run(%|
+          query {
+            employees(sort: [{ att: name, dir: asc }]) {
+              nodes {
+                name
+              }
+            }
+          }
+        |)
+        expect(names(json)).to eq(%w(Agatha Stephen))
+      end
+
+      context "when customizing the sort" do
+        before do
+          resource.sort_all do |scope, att, dir|
+            scope[:sort] ||= []
+            scope[:sort] << {:first_name => :asc}
+            scope
+          end
+          schema!
+        end
+
+        it "is respected" do
+          json = run(%|
+            query {
+              employees(sort: [{ att: name, dir: desc }]) {
+                nodes {
+                  name
+                }
+              }
+            }
+          |)
+          expect(names(json)).to eq(%w(Agatha Stephen))
+        end
+      end
+
+      it "filters correctly" do
+        json = run(%|
+          query {
+            employees(filter: { name: { eq: "Agatha" } }) {
+              nodes {
+                name
+              }
+            }
+          }
+        |)
+        expect(names(json)).to eq(%w(Agatha))
+      end
+
+      context "when customizing the filter" do
+        before do
+          resource.filter :name do
+            eq do |scope, value|
+              scope[:conditions] ||= {}
+              scope[:conditions][:first_name] = "Stephen"
+              scope
+            end
+          end
+          schema!
+        end
+
+        it "is respected" do
+          json = run(%|
+            query {
+              employees(filter: { name: { eq: "Agatha" } }) {
+                nodes {
+                  name
+                }
+              }
+            }
+          |)
+          expect(names(json)).to eq(%w(Stephen))
+        end
+      end
+
+      context "when computing stats" do
+        before do
+          resource.attribute :years_old, :integer, alias: :age
+          resource.stat years_old: [:sum]
+          schema!
+        end
+
+        it "works" do
+          json = run(%|
+            query {
+              employees {
+                edges {
+                  node {
+                    yearsOld
+                  }
+                }
+                stats {
+                  yearsOld {
+                    sum
+                  }
+                }
+              }
+            }
+          |)
+          expect(json).to eq({
+            employees: {
+              edges: [
+                {
+                  node: {
+                    yearsOld: 60
+                  }
+                },
+                {
+                  node: {
+                    yearsOld: 70
+                  }
+                }
+              ],
+              stats: {
+                yearsOld: {
+                  sum: 130.0
+                }
+              }
+            }
+          })
+        end
+
+        context "when a customization" do
+          before do
+            resource.stat years_old: [:sum] do
+              sum do |scope, attr|
+                # this is 'super'
+                records = PORO::DB.all(scope.except(:page, :per))
+                sum = records.map { |r| r.send(attr) || 0 }.sum
+
+                # this is customization
+                sum * 100
+              end
+            end
+            schema!
+          end
+
+          it "is respected" do
+            json = run(%|
+              query {
+                employees {
+                  edges {
+                    node {
+                      yearsOld
+                    }
+                  }
+                  stats {
+                    yearsOld {
+                      sum
+                    }
+                  }
+                }
+              }
+            |)
+            expect(json[:employees][:stats]).to eq({
+              yearsOld: {
+                sum: 13000.0
+              }
+            })
+          end
         end
       end
     end

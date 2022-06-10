@@ -3,17 +3,19 @@ module GraphitiGql
     module Fields
       class Attribute
         def initialize(name, config)
-          @name = name
           @config = config
+          @name = name
+          @alias = config[:alias]
         end
 
         def apply(type)
           is_nullable = !!@config[:null]
           _config = @config
           _name = @name
+          _alias = @alias 
           opts = @config.slice(:null, :deprecation_reason)
-          type.field(@name, field_type, **opts)
-          type.define_method @name do
+          type.field(_name, field_type, **opts)
+          type.define_method _name do
             if (readable = _config[:readable]).is_a?(Symbol)
               resource = object.instance_variable_get(:@__graphiti_resource)
               unless resource.send(readable)
@@ -24,7 +26,7 @@ module GraphitiGql
             value = if _config[:proc]
               instance_eval(&_config[:proc])
             else
-              object.send(_name)
+              object.send(_alias || _name)
             end
             return if value.nil?
             Graphiti::Types[_config[:type]][:read].call(value)
