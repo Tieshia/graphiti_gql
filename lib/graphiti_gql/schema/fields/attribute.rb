@@ -36,9 +36,12 @@ module GraphitiGql
         private
 
         def field_type
-          canonical_graphiti_type = Graphiti::Types.name_for(@config[:type])
-          field_type = GQL_TYPE_MAP[canonical_graphiti_type.to_sym]
-          field_type = String if @name == :id
+          field_type = Graphiti::Types[@config[:type]][:graphql_type]
+          if !field_type
+            canonical_graphiti_type = Graphiti::Types.name_for(@config[:type])
+            field_type = GQL_TYPE_MAP[canonical_graphiti_type.to_sym]
+            field_type = String if @name == :id
+          end
           field_type = [field_type] if @config[:type].to_s.starts_with?("array_of")
           field_type
         end

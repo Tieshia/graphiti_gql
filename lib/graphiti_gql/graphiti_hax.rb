@@ -166,7 +166,9 @@ module GraphitiGql
       alias_method :filter_precise_datetime_not_eq, :filter_not_eq
     end
   end
-  Graphiti::Adapters::ActiveRecord.send(:include, ActiveRecordAdapterExtras)
+  if defined?(Graphiti::Adapters::ActiveRecord)
+    Graphiti::Adapters::ActiveRecord.send(:include, ActiveRecordAdapterExtras)
+  end
 
   Graphiti::Adapters::Abstract.class_eval do
     class << self

@@ -4243,5 +4243,98 @@ RSpec.describe GraphitiGql do
         end
       end
     end
+
+    describe "custom types" do
+      let!(:employee) { PORO::Employee.create(age: 45) }
+
+      before do
+        definition = Dry::Types::Nominal.new(Integer)
+        _out = definition.constructor do |input|
+          input * 10
+        end
+      
+        _in = definition.constructor do |input|
+          input.to_i / 10
+        end
+      
+        # Register it with Graphiti
+        Graphiti::Types[:foo_type] = {
+          params: _in,
+          read: _out,
+          write: _in,
+          kind: 'scalar',
+          canonical_name: :integer,
+          graphql_type: String,
+          description: 'Integer renders as string'
+        }
+      end
+
+      after do
+        Graphiti::Types.map.delete(:foo_type)
+      end
+
+      context "when graphql_type is specified" do
+        before do
+          # register foo type with gql type integer
+          resource.attribute :foo, :foo_type, alias: :age
+          schema!
+        end
+
+        context "when reading" do
+          it "has the right type in the schema" do
+            registered = GraphitiGql::Schema.registry["POROEmployee"]
+            employee_type = registered[:type]
+            foo_type = employee_type.fields["foo"].type
+            expect(foo_type).to eq(GraphQL::Types::String)
+          end
+
+          it "is respected" do
+            json = run(%|
+              query {
+                employees {
+                  edges {
+                    node {
+                      foo
+                    }
+                  }
+                }
+              }
+            |)
+            expect(json).to eq({
+              employees: {
+                edges: [
+                  { node: { foo: "600" } },
+                  { node: { foo: "700" } },
+                  { node: { foo: "450" } }
+                ]
+              }
+            })
+          end
+        end
+
+        context "when filtering" do
+          it "is respected" do
+            json = run(%|
+              query {
+                employees(filter: { foo: { eq: "700" } }) {
+                  edges {
+                    node {
+                      foo
+                    }
+                  }
+                }
+              }
+            |)
+            expect(json).to eq({
+              employees: {
+                edges: [
+                  { node: { foo: "700" } }
+                ]
+              }
+            })
+          end
+        end
+      end
+    end
   end
 end
