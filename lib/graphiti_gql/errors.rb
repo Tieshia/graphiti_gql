@@ -17,5 +17,21 @@ module GraphitiGql
         "You are not authorized to read field #{@field}"
       end
     end
+
+    class NullFilter < Base
+      def initialize(name)
+        @name = name
+      end
+
+      def message
+        "Filter '#{@name}' does not support null"
+      end
+    end
+
+    class UnsupportedLast < Base
+      def message
+        "We do not currently support combining 'last' with 'before' or 'after'"
+      end
+    end
   end
 end

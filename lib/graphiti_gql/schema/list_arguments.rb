@@ -58,18 +58,21 @@ module GraphitiGql
         filter_graphql_name = "#{type_name}Filter#{filter_name.to_s.camelize(:lower)}"
         klass.graphql_name(filter_graphql_name)
         filter_config[:operators].keys.each do |operator|
-          canonical_graphiti_type = Graphiti::Types
-            .name_for(filter_config[:type])
-          type = GQL_TYPE_MAP[canonical_graphiti_type]
-          type = String if filter_name == :id
-          required = !!filter_config[:required] && operator == "eq"
-  
+          graphiti_type = Graphiti::Types[filter_config[:type]]
+          type = graphiti_type[:graphql_type]
+          if !type
+            canonical_graphiti_type = Graphiti::Types
+              .name_for(filter_config[:type])
+            type = GQL_TYPE_MAP[canonical_graphiti_type]
+            type = String if filter_name == :id
+          end
+
           if (allowlist = filter_config[:allow])
             type = define_allowlist_type(filter_graphql_name, allowlist)
           end
   
           type = [type] unless !!filter_config[:single]
-          klass.argument operator, type, required: required
+          klass.argument operator, type, required: false
         end
         klass
       end

@@ -29,6 +29,10 @@ require "graphiti_gql/engine" if defined?(Rails)
 module GraphitiGql
   class Error < StandardError; end
 
+  class Configuration
+    attr_accessor :application_controller
+  end
+
   def self.schema!
     Schema::Registry.instance.clear
     resources ||= Graphiti.resources.reject(&:abstract_class?)
@@ -37,6 +41,14 @@ module GraphitiGql
 
   def self.schema
     @schema
+  end
+
+  def self.config
+    @config ||= Configuration.new
+  end
+
+  def self.configure
+    yield config
   end
 
   def self.entrypoints=(val)

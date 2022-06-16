@@ -435,6 +435,52 @@ RSpec.describe GraphitiGql do
           })
         end
 
+        context "when filter is null" do
+          context "and allow_nil is true" do
+            let!(:null_name) { PORO::Employee.create }
+
+            before do
+              resource.filter :first_name, allow_nil: true
+              schema!
+            end
+
+            it "is allowed" do
+              json = run(%|
+                query {
+                  employees(filter: { firstName: { eq: null } }) {
+                    nodes {
+                      id
+                      firstName
+                    }
+                  }
+                }
+              |)
+              expect(json[:employees][:nodes][0][:id]).to eq(null_name.id.to_s)
+            end
+          end
+
+          context "and allow_nil is false" do
+            it "is not allowed" do
+              do_run = lambda do
+                run(%|
+                  query {
+                    employees(filter: { firstName: { eq: null } }) {
+                      nodes {
+                        firstName
+                      }
+                    }
+                  }
+                |)
+              end
+              expect(&do_run)
+                .to raise_error(
+                  GraphitiGql::Errors::NullFilter,
+                  "Filter 'first_name' does not support null"
+                )
+            end
+          end
+        end
+
         context "when by id" do
           it "is a passed as a string" do
             json = run(%|
