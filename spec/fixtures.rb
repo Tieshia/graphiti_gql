@@ -261,11 +261,15 @@ module PORO
   end
 
   class Team < Base
-    attr_accessor :name, :team_memberships, :department_id, :employee_teams
+    attr_accessor :name, :team_memberships, :department_id, :employee_teams,
+      :_edge_primary,
+      :_edge_employee_id,
+      :_edge_team_id,
+      :_edge_id
   end
 
   class EmployeeTeam < Base
-    attr_accessor :employee_id, :team_id
+    attr_accessor :employee_id, :team_id, :primary
   end
 
   class CreditCard < Base
@@ -468,7 +472,11 @@ module PORO
         team_data = PORO::DB.data[:teams].select { |t| team_ids.include?(t[:id]) }
         teams = team_data.map { |d| PORO::Team.new(d) }
         teams.each do |team|
-          team.employee_teams = employee_teams.select { |et| et.team_id == team.id }
+          employee_team = employee_teams.find { |et| et.team_id == team.id }
+          employee_team.attributes.each_pair do |key, value|
+            prop = "_edge_#{key}"
+            team.send("#{prop}=", value)
+          end
         end
         teams
       else

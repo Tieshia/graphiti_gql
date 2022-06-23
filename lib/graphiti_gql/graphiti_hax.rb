@@ -121,6 +121,24 @@ module GraphitiGql
   end
   Graphiti::Scoping::Paginate.send(:prepend, PaginateExtras)
 
+  module ManyToManyExtras
+    extend ActiveSupport::Concern
+
+    class_methods do
+      attr_accessor :edge_resource
+
+      def attribute(*args, &blk)
+        @edge_resource = Class.new(Graphiti::Resource) do
+          def self.abstract_class?
+            true
+          end
+        end
+        @edge_resource.attribute(*args, &blk)
+      end
+    end
+  end
+  Graphiti::Sideload::ManyToMany.send(:include, ManyToManyExtras)
+
   module StatsExtras
     def calculate_stat(name, function)
       config = @resource.all_attributes[name] || {}
@@ -217,4 +235,17 @@ module GraphitiGql
     end
   end
   Graphiti::Scope.send(:prepend, ScopeExtras)
+
+  module ActiveRecordManyToManyExtras
+    # flipping .includes to .joins
+    def belongs_to_many_filter(scope, value)
+      scope
+        .joins(through_relationship_name)
+        .where(belongs_to_many_clause(value, type))
+    end
+  end
+  if defined?(ActiveRecord)
+    ::Graphiti::Adapters::ActiveRecord::ManyToManySideload
+      .send(:prepend, ActiveRecordManyToManyExtras)
+  end
 end

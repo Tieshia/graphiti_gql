@@ -2970,17 +2970,18 @@ RSpec.describe GraphitiGql do
           end
         end
 
+        # ActiveRecord-specific. Needs integration test dir
         context "many_to_many" do
           let!(:employee1_team1) do
-            PORO::EmployeeTeam.create(employee_id: employee1.id, team_id: team1.id)
+            PORO::EmployeeTeam.create(employee_id: employee1.id, team_id: team1.id, primary: false)
           end
 
           let!(:employee1_team2) do
-            PORO::EmployeeTeam.create(employee_id: employee1.id, team_id: team2.id)
+            PORO::EmployeeTeam.create(employee_id: employee1.id, team_id: team2.id, primary: true)
           end
 
           let!(:employee2_team1) do
-            PORO::EmployeeTeam.create(employee_id: employee2.id, team_id: team3.id)
+            PORO::EmployeeTeam.create(employee_id: employee2.id, team_id: team3.id, primary: false)
           end
 
           let!(:team1) do
@@ -3074,6 +3075,123 @@ RSpec.describe GraphitiGql do
                   }
                 }
               ))
+            end
+          end
+
+          context "when metadata" do
+            let(:field) { "isPrimary" }
+            let(:json) do
+              run(%|
+                query {
+                  employees {
+                    nodes {
+                      teams {
+                        edges {
+                          #{field}
+                          node {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              |, {}, ctx)
+            end
+            let(:ctx) { {} }
+
+            let(:values) do
+              json[:employees][:nodes].map do |node|
+                node[:teams][:edges].map { |e| e[field.to_sym] }
+              end.flatten
+            end
+
+            def setup!
+              opts = { foreign_key: { employee_teams: :employee_id } }
+              resource.many_to_many(:teams, opts, &blk)
+              schema!
+            end
+
+            context "when the attribute is not customized" do
+              let(:field) { "primary" }
+              let(:blk) do
+                lambda do |*args|
+                  attribute :primary, :boolean
+                end
+              end
+
+              it "works" do
+                setup!
+                expect(values).to eq([false, true, false])
+              end
+
+              context "but alias is passed" do
+                let(:field) { "isPrimary" }
+                let(:blk) do
+                  lambda do |*args|
+                    attribute :is_primary, :boolean, alias: :primary
+                  end
+                end
+
+                it "is honored" do
+                  setup!
+                  expect(values).to eq([false, true, false])
+                end
+              end
+            end
+
+            context "when the attribute is customized" do
+              let(:blk) do
+                lambda do |*args|
+                  attribute :is_primary, :boolean do |edge|
+                    edge[:primary]
+                  end
+                end
+              end
+
+              it "works" do
+                setup!
+                expect(values).to eq([false, true, false])
+              end
+            end
+
+            # TODO docs - :admin? gets called on child resource
+            context "when guarded" do
+              let(:blk) do
+                lambda do |*args|
+                  attribute :is_primary, :boolean, readable: :admin? do |edge|
+                    edge[:primary]
+                  end
+                end
+              end
+
+              before do
+                allow_any_instance_of(PORO::TeamResource)
+                  .to receive(:admin?) { is_admin }
+              end
+
+              context "and the guard passes" do
+                let(:is_admin) { true }
+
+                it "works" do
+                  setup!
+                  expect(values).to eq([false, true, false])
+                end
+              end
+
+              context "and the guard fails" do
+                let(:is_admin) { false }
+
+                it "raises error" do
+                  setup!
+                  run = -> { json }
+                  expect(&run)
+                    .to raise_error(
+                      GraphitiGql::Errors::UnauthorizedField,
+                      "You are not authorized to read field employees.nodes.0.teams.edges.0.isPrimary"
+                    )
+                end
+              end
             end
           end
         end
