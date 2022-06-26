@@ -32,6 +32,21 @@ module GraphitiGql
       end
     end
 
+    def self.base_object
+      klass = Class.new(GraphQL::Schema::Object)
+      # TODO make this config maybe
+      if defined?(ActionView)
+        klass.send(:include, ActionView::Helpers::TranslationHelper)
+        klass.class_eval do
+          def initialize(*)
+            super
+            @virtual_path = "."
+          end
+        end
+      end
+      klass
+    end
+
     def self.registry
       Registry.instance
     end

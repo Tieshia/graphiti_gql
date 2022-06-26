@@ -24,6 +24,7 @@ require "graphiti_gql/schema/fields/to_many"
 require "graphiti_gql/schema/fields/to_one"
 require "graphiti_gql/schema/fields/attribute"
 require "graphiti_gql/schema/fields/stats"
+require "graphiti_gql/active_resource"
 require "graphiti_gql/engine" if defined?(Rails)
 
 module GraphitiGql

@@ -3,9 +3,8 @@ module GraphitiGql
     class Query
       def initialize(resources, existing_query: nil)
         @resources = resources
-        @query_class = Class.new(existing_query || ::GraphQL::Schema::Object)
+        @query_class = Class.new(existing_query || Schema.base_object)
         @query_class.graphql_name "Query"
-        @query_class.field_class ::GraphQL::Schema::Field
       end
 
       def build

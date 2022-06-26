@@ -68,7 +68,7 @@ module GraphitiGql
             Registry.instance[registry_name][:type]
           end
         else
-          klass = Class.new(GraphQL::Schema::Object)
+          klass = Class.new(Schema.base_object)
         end
 
         klass

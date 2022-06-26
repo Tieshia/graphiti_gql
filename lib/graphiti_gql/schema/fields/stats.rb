@@ -29,7 +29,7 @@ module GraphitiGql
           name = Registry.instance.key_for(@resource)
           stat_graphql_name = "#{name}Stats"
           return Registry.instance[stat_graphql_name][:type] if Registry.instance[stat_graphql_name]
-          klass = Class.new(GraphQL::Schema::Object)
+          klass = Class.new(Schema.base_object)
           klass.graphql_name(stat_graphql_name)
           @resource.stats.each_pair do |name, config|
             calc_class = build_calc_class(stat_graphql_name, name, config.calculations.keys)
@@ -41,7 +41,7 @@ module GraphitiGql
     
         def build_calc_class(stat_graphql_name, stat_name, calculations)
           name = "#{stat_graphql_name}#{stat_name}Calculations"
-          klass = Class.new(GraphQL::Schema::Object)
+          klass = Class.new(Schema.base_object)
           klass.graphql_name(name)
           calculations.each do |calc|
             klass.field calc, Float, null: false
