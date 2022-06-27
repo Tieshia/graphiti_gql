@@ -1709,6 +1709,57 @@ RSpec.describe GraphitiGql do
             |)
           end
 
+          context "when custom params block" do
+            before do
+              position1.update_attributes(active: true)
+              position2.update_attributes(active: false)
+              position3.update_attributes(active: true)
+
+              $spy = OpenStruct.new
+              resource.has_many :positions do
+                params do |hash, employees|
+                  $spy.employees = employees
+                  hash[:filter][:active] = { eq: true }
+                end
+              end
+              schema!
+            end
+
+            after do
+              $spy = nil
+            end
+
+            def json
+              run(%|
+                query {
+                  employees {
+                    nodes {
+                      positions {
+                        nodes {
+                          title
+                        }
+                      }
+                    }
+                  }
+                }
+              |)
+            end
+
+            it "is honored" do
+              titles = json[:employees][:nodes].map do |n|
+                n[:positions][:nodes].map { |pn| pn[:title] }
+              end.flatten
+              expect(titles).to match_array(['title1', 'title3'])
+            end
+
+            it "yields parent records correctly" do
+              json
+              expect($spy.employees).to all(be_a(PORO::Employee))
+              expect($spy.employees.map(&:id))
+                .to eq([employee1.id, employee2.id])
+            end
+          end
+
           context "when manually paginating" do
             it "is respected" do
               expect(PORO::PositionResource)
@@ -3078,6 +3129,54 @@ RSpec.describe GraphitiGql do
             end
           end
 
+          context "when custom params block" do
+            before do
+              $spy = OpenStruct.new
+              resource.many_to_many :teams, foreign_key: {employee_teams: :employee_id} do
+                params do |hash, parents|
+                  $spy.employees = parents
+                  hash[:sort] = "-id" # TODO
+                end
+              end
+              schema!
+            end
+
+            after do
+              $spy = nil
+            end
+
+            let(:json) do
+              run(%(
+                query {
+                  employees {
+                    nodes {
+                      teams {
+                        nodes {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              ))
+            end
+
+            it "is honored" do
+              nodes = json[:employees][:nodes][0][:teams][:nodes]
+              expect(nodes.map { |n| n[:id].to_i }).to eq([
+                team2.id,
+                team1.id
+              ])
+            end
+
+            it "yields parents correctly" do
+              json
+              expect($spy.employees).to all(be_a(PORO::Employee))
+              expect($spy.employees.map(&:id))
+                .to eq([employee1.id, employee2.id])
+            end
+          end
+
           context "when metadata" do
             let(:field) { "isPrimary" }
             let(:json) do
@@ -3799,6 +3898,64 @@ RSpec.describe GraphitiGql do
                   }
                 }
               ))
+            end
+          end
+
+          context "when custom params block" do
+            let!(:note2) do
+              PORO::Note.create notable_id: employee2.id,
+                                notable_type: "PORO::Employee"
+            end
+
+            let!(:note3) do
+              PORO::Note.create notable_id: employee2.id,
+                                notable_type: "PORO::Employee"
+            end
+
+            before do
+              $spy = OpenStruct.new
+              resource.polymorphic_has_many :notes, as: :notable do
+                params do |hash, parents|
+                  hash[:sort] = "-id" # TODO
+                  $spy.employees = parents
+                end
+              end
+              schema!
+            end
+
+            after do
+              $spy = nil
+            end
+
+            let(:json) do
+              run(%(
+                query {
+                  employees {
+                    nodes {
+                      notes {
+                        nodes {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              ))
+            end
+
+            it "is honored" do
+              nodes = json[:employees][:nodes][1][:notes][:nodes]
+              expect(nodes.map { |n| n[:id].to_i })
+                .to eq([note3.id, note2.id, note1.id])
+            end
+
+            it "yields parents correctly" do
+              json
+              expect($spy.employees).to all(be_a(PORO::Employee))
+              expect($spy.employees.map(&:id)).to eq([
+                employee1.id,
+                employee2.id
+              ])
             end
           end
         end

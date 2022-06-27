@@ -1,16 +1,16 @@
 module GraphitiGql
   module Loaders
     class ManyToMany < Many
-      def assign(ids, proxy)
+      def assign(parent_records, proxy)
         thru = @sideload.foreign_key.keys.first
         fk = @sideload.foreign_key[thru]
         add_join_table_magic(proxy)
         records = proxy.data
-        ids.each do |id|
+        parent_records.each do |pr|
           corresponding = records.select do |record|
-            record.send(:"_edge_#{fk}") == id
+            record.send(:"_edge_#{fk}") == pr.send(@sideload.primary_key)
           end
-          fulfill(id, [corresponding, proxy])
+          fulfill(pr, [corresponding, proxy])
         end
       end
 

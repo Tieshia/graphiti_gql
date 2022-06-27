@@ -16,13 +16,25 @@ module GraphitiGql
         @params = params
       end
 
-      def perform(ids)
-        raise ::Graphiti::Errors::UnsupportedPagination if paginating? && ids.length > 1
-        raise Errors::UnsupportedStats if requesting_stats? && ids.length > 1 && !can_group?
+      def perform(parent_records)
+        raise ::Graphiti::Errors::UnsupportedPagination if paginating? && parent_records.length > 1
+        raise Errors::UnsupportedStats if requesting_stats? && parent_records.length > 1 && !can_group?
 
-        build_params(ids)
+        ids = parent_records.map do |pr|
+          pk = pr.send(@sideload.primary_key)
+          if @sideload.polymorphic_as
+            hash = {}
+            hash[@sideload.foreign_key] = pk
+            hash[:"#{@sideload.polymorphic_as}_type"] = pr.class.name
+            hash
+          else
+            pk
+          end
+        end
+
+        build_params(ids, parent_records)
         proxy = @sideload.resource.class.all(@params)
-        assign(ids, proxy)
+        assign(parent_records, proxy)
       end
 
       def assign(ids, proxy)
@@ -31,7 +43,7 @@ module GraphitiGql
 
       private
 
-      def build_params(ids)
+      def build_params(ids, parent_records)
         @params[:filter] ||= {}
 
         if @sideload.polymorphic_as
@@ -58,6 +70,10 @@ module GraphitiGql
         unless @params.key?(:page) && @params[:page].key?(:size)
           @params[:page] ||= {}
           @params[:page][:size] = 999
+        end
+
+        if @sideload.params_proc
+          @sideload.params_proc.call(@params, parent_records)
         end
       end
 

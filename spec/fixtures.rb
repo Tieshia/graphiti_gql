@@ -478,6 +478,11 @@ module PORO
             team.send("#{prop}=", value)
           end
         end
+
+        if scope[:sort] == [{ id: :desc }]
+          teams.reverse!
+        end
+
         teams
       else
         super
