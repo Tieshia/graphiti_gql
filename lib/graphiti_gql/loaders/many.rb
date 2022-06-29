@@ -35,7 +35,8 @@ module GraphitiGql
         end
 
         build_params(ids, parent_records)
-        proxy = @sideload.resource.class.all(@params)
+        resource = Schema.registry.get(@sideload.resource.class)[:resource]
+        proxy = resource.all(@params)
         assign(parent_records, proxy)
       end
 

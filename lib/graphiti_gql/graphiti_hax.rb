@@ -180,7 +180,11 @@ module GraphitiGql
   end
 
   _in = definition.constructor do |input|
-    Time.zone.parse(input)
+    if input.is_a?(ActiveSupport::TimeWithZone)
+      input = input.utc.round(10).iso8601(6)
+    else
+      Time.zone.parse(input)
+    end
   end
 
   # Register it with Graphiti

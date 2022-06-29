@@ -19,7 +19,9 @@ module GraphitiGql
             if _sideload.type == :has_one
               id = object.send(_sideload.primary_key)
               params = { filter: { _sideload.foreign_key => { eq: id } } }
-              return _sideload.resource.class.all(params).data[0]
+
+              resource = Schema.registry.get(@sideload.resource.class)[:resource]
+              return resource.all(params).data[0]
             end
 
             lookahead = arguments[:lookahead]

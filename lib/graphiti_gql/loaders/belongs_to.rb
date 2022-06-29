@@ -53,7 +53,8 @@ module GraphitiGql
           end
         else
           params = {filter: {id: {eq: ids.join(",")}}}
-          records = @sideload.resource.class.all(params).data
+          resource = Schema.registry.get(@sideload.resource.class)[:resource]
+          records = resource.all(params).data
           map = records.index_by { |record| record.id }
           ids.each { |id| fulfill(id, map[id]) }
         end
