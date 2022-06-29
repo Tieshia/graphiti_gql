@@ -4139,6 +4139,80 @@ RSpec.describe GraphitiGql do
             end
           end
         end
+
+        context "has_one" do
+          let!(:pos1) do
+            PORO::Position.create(rank: 2, employee_id: employee1.id)
+          end
+          let!(:pos2) do
+            PORO::Position.create(rank: 1, employee_id: employee1.id)
+          end
+          let!(:pos3) do
+            PORO::Position.create(rank: 3, employee_id: employee1.id)
+          end
+
+          before do
+            resource.has_one :top_position,
+              resource: PORO::PositionResource,
+              foreign_key: :employee_id
+            schema!
+          end
+
+          let(:json) do
+            json = run(%|
+              query {
+                employees {
+                  nodes {
+                    topPosition {
+                      id
+                      title
+                    }
+                  }
+                }
+              }
+            |)
+          end
+
+          it "automatically limits to single record" do
+            node =  json[:employees][:nodes][0]
+            expect(node[:topPosition][:id]).to eq(pos1.id.to_s)
+          end
+
+          context "when custom params proc" do
+            before do
+              opts = {
+                resource: PORO::PositionResource,
+                foreign_key: :employee_id
+              }
+              $spy = OpenStruct.new
+              resource.has_one :top_position, opts do
+                params do |hash, parents|
+                  $spy.employees = parents
+                  hash[:filter][:rank] = { eq: 1 }
+                end
+              end
+              schema!
+            end
+
+            after do
+              $spy = nil
+            end
+
+            it "is honored" do
+              node =  json[:employees][:nodes][0]
+              expect(node[:topPosition][:id]).to eq(pos2.id.to_s)
+            end
+
+            it "yields parents correctly" do
+              json
+              expect($spy.employees).to all(be_a(PORO::Employee))
+              expect($spy.employees.map(&:id)).to eq([
+                employee1.id,
+                employee2.id
+              ])
+            end
+          end
+        end
       end
     end
 

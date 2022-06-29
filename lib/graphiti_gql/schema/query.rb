@@ -31,7 +31,7 @@ module GraphitiGql
 
       def add_relationships
         each_relationship do |type, sideload_type, sideload|
-          if [:has_many, :many_to_many].include?(sideload.type)
+          if [:has_many, :many_to_many, :has_one].include?(sideload.type)
             Fields::ToMany.new(sideload, sideload_type).apply(type)
           else
             Fields::ToOne.new(sideload, sideload_type).apply(type)

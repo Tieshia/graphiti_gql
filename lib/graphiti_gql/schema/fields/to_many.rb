@@ -12,12 +12,16 @@ module GraphitiGql
         end
 
         def apply(type)
-          field = type.field @sideload.name,
-            @sideload_type.connection_type,
-            null: false,
+          opts = {
+            null: has_one?,
             connection: false,
-            extensions: [RelayConnectionExtension],
             extras: [:lookahead]
+          }
+          opts[:extensions] = [RelayConnectionExtension] unless has_one?
+          field_type = has_one? ? @sideload_type : @sideload_type.connection_type
+          field = type.field @sideload.name,
+            field_type,
+            **opts
           ListArguments.new(@sideload.resource.class, @sideload).apply(field)
           _sideload = @sideload
           type.define_method(@sideload.name) do |**arguments|
@@ -28,6 +32,10 @@ module GraphitiGql
         end
 
         private
+
+        def has_one?
+          @sideload.type == :has_one
+        end
 
         def customized_edge?
           @sideload.type == :many_to_many && @sideload.class.edge_resource

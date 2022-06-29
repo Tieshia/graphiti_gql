@@ -6,6 +6,8 @@ module GraphitiGql
           PolymorphicHasMany.for(sideload, params)
         elsif sideload.type == :many_to_many
           ManyToMany.for(sideload, params)
+        elsif sideload.type == :has_one
+          HasOne.for(sideload, params)
         else
           HasMany.for(sideload, params)
         end
