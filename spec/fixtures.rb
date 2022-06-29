@@ -605,6 +605,10 @@ module PORO
 
   class CreditCardResource < ApplicationResource
     self.polymorphic = %w[PORO::VisaResource PORO::GoldVisaResource PORO::MastercardResource]
+    class << self
+      # for testing
+      attr_accessor :resolve_hook
+    end
 
     def base_scope
       {type: [:visas, :gold_visas, :mastercards]}
@@ -615,6 +619,14 @@ module PORO
     filter :employee_id, :integer
 
     has_many :transactions
+
+    # Because it's tricky to Class.new polymorphic parents in tests
+    def resolve(scope)
+      if (hook = self.class.resolve_hook)
+        hook.call(self)
+      end
+      super
+    end
   end
 
   class TransactionResource < ApplicationResource

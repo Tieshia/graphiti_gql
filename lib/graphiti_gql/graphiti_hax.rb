@@ -11,6 +11,27 @@ module GraphitiGql
       end
     end
 
+    def selections
+      return @selections if @selections
+      lookahead = context[:current_arguments]
+        .keyword_arguments[:lookahead]
+      nodes = lookahead.selection(:nodes)
+      if !nodes.selected?
+        nodes = lookahead
+          .selection(:edges)
+          .selection(:node)
+      end
+
+      if !nodes.selected?
+        nodes = lookahead
+      end
+
+      @selections = nodes
+        .selections
+        .map(&:name).map { |name| name.to_s.underscore.to_sym }
+      @selections
+    end
+
     class_methods do
       def attribute(*args)
         super(*args).tap do

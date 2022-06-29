@@ -1864,11 +1864,6 @@ RSpec.describe GraphitiGql do
             end
           end
 
-          context "when customized with params block" do
-            xit "is honored - should we support this? what about overrides?" do
-            end
-          end
-
           context "when requesting stats" do
             let!(:employee3) { PORO::Employee.create(first_name: "Jane") }
 
@@ -2353,6 +2348,43 @@ RSpec.describe GraphitiGql do
                   }
                 }
               |)
+            end
+
+            context "but custom FK" do
+              before do
+                PORO::Position.create(emp_id: 87)
+                position_resource.belongs_to :employee, foreign_key: :emp_id
+                schema!
+              end
+
+              it "still works" do
+                expect(PORO::EmployeeResource).to_not receive(:all)
+                json = run(%|
+                  query {
+                    positions {
+                      nodes {
+                        employee {
+                          id
+                        }
+                      }
+                    }
+                  }
+                |)
+                expect(json).to eq({
+                  positions: {
+                    nodes: [
+                      {
+                        employee: nil
+                      },
+                      {
+                        employee: {
+                          id: "87"
+                        }
+                      }
+                    ]
+                  }
+                })
+              end
             end
           end
 
@@ -4681,6 +4713,283 @@ RSpec.describe GraphitiGql do
                 ]
               }
             })
+          end
+        end
+      end
+    end
+
+    describe "Resource#selections" do
+      def apply(resource, attr = :selections)
+        $spy = OpenStruct.new
+        old = resource.new.method(:resolve)
+        resource.define_method :resolve do |scope|
+          $spy.send(:"#{attr}=", selections)
+          instance_exec(scope, &old)
+        end
+        schema!
+      end
+
+      after do
+        $spy = nil
+      end
+
+      context "when top-level" do
+        before do
+          apply(resource)
+        end
+
+        context "when single entity" do
+          it "works" do
+            run(%|
+              query {
+                employee(id: "#{employee1.id}") {
+                  firstName
+                  age
+                }
+              }
+            |)
+            expect($spy.selections).to eq([:first_name, :age])
+          end
+        end
+
+        context "when list" do
+          context "via nodes" do
+            it "works" do
+              json = run(%|
+                query {
+                  employees {
+                    nodes {
+                      id
+                      firstName
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections).to eq([:id, :first_name])
+            end
+          end
+
+          context "via edges" do
+            it "works" do
+              json = run(%|
+                query {
+                  employees {
+                    edges {
+                      node {
+                        id
+                        firstName
+                      }
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections).to eq([:id, :first_name])
+            end
+          end
+        end
+      end
+
+      context "when association" do
+        context "when has_many" do
+          let!(:position) do
+            PORO::Position.create(employee_id: employee1.id)
+          end
+
+          before do
+            apply(position_resource)
+          end
+
+          context "via nodes" do
+            it "works" do
+              json = run(%|
+                query {
+                  employees {
+                    nodes {
+                      positions {
+                        nodes {
+                          title
+                          active
+                          rank
+                        }
+                      }
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections).to eq([:title, :active, :rank])
+            end
+          end
+
+          context "via edges" do
+            it "works" do
+              json = run(%|
+                query {
+                  employees {
+                    nodes {
+                      positions {
+                        edges {
+                          node {
+                            title
+                            active
+                            rank
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections).to eq([:title, :active, :rank])
+            end
+          end
+        end
+
+        context "when belongs_to" do
+          before do
+            PORO::Position.create(employee_id: employee1.id)
+            apply(resource)
+          end
+
+          it "works" do
+            json = run(%|
+              query {
+                positions {
+                  nodes {
+                    employee {
+                      id
+                      lastName
+                      age
+                    }
+                  }
+                }
+              }
+            |)
+            expect($spy.selections).to eq([:id, :last_name, :age])
+          end
+        end
+
+        context "when polymorphic" do
+          let!(:visa) { PORO::Visa.create(id: 1, number: "1", employee_id: employee2.id) }
+          let!(:gold_visa) { PORO::GoldVisa.create(id: 2, number: "2") }
+          let!(:mastercard) { PORO::Mastercard.create(id: 3, number: "3") }
+
+          before do
+            $spy = OpenStruct.new
+            PORO::CreditCardResource.resolve_hook = ->(instance) {
+              $spy.selections = instance.selections
+            }
+            schema!
+          end
+
+          context "when not fragmenting" do
+            it "works" do
+              json = run(%|
+                query {
+                  creditCards {
+                    nodes {
+                      id
+                      number
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections).to eq([:id, :number])
+            end
+          end
+
+          context "when fragmenting on common field" do
+            it "works" do
+              json = run(%|
+                query {
+                  creditCards {
+                    nodes {
+                      id
+                      description
+                      ...on POROMastercard {
+                        number
+                      }
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections).to eq([:id, :description, :number])
+            end
+          end
+
+          context "when fragmenting on type-specific field" do
+            it "works" do
+              json = run(%|
+                query {
+                  creditCards {
+                    nodes {
+                      id
+                      description
+                      ...on POROVisa {
+                        visaOnlyAttr
+                      }
+                    }
+                  }
+                }
+              |)
+              expect($spy.selections)
+                .to eq([:id, :description, :visa_only_attr])
+            end
+          end
+        end
+
+        context "when deeply nested with siblings" do
+          before do
+            dept = PORO::Department.create
+            PORO::Position.create \
+              employee_id: employee1.id,
+              department_id: dept.id
+            department_resource = Class.new(PORO::DepartmentResource) do
+              def self.name;"PORO::DepartmentResource";end
+            end
+            team_resource = Class.new(PORO::TeamResource) do
+              def self.name;"PORO::TeamResource";end
+            end
+            apply(resource, :employee_selections)
+            apply(position_resource, :position_selections)
+            apply(department_resource, :department_selections)
+            apply(team_resource, :team_selections)
+          end
+
+          it "works" do
+            json = run(%|
+              query {
+                employees {
+                  nodes {
+                    firstName
+                    age
+                    teams {
+                      nodes {
+                        name
+                        __typename
+                      }
+                    }
+                    positions {
+                      nodes {
+                        title
+                        rank
+                        department {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            |)
+            expect($spy.employee_selections)
+              .to eq([:first_name, :age, :teams, :positions])
+            expect($spy.position_selections)
+              .to eq([:title, :rank, :department])
+            expect($spy.department_selections)
+              .to eq([:id, :name])
+            expect($spy.team_selections)
+              .to eq([:name, :__typename])
           end
         end
       end
