@@ -66,6 +66,9 @@ module GraphitiGql
   end
 
   def self.run(query_string, variables = {}, context = {})
+    if context.empty? && Graphiti.context[:object]
+      context = Graphiti.context[:object]
+    end
     Graphiti.with_context(context) do
       result = schema.execute query_string,
         variables: variables,

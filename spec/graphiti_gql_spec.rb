@@ -4994,5 +4994,54 @@ RSpec.describe GraphitiGql do
         end
       end
     end
+
+    describe "context" do
+      context "when set beforehand" do
+        before do
+          Graphiti.context = { object: { foo: "bar" } }
+          $spy = OpenStruct.new
+          resource.class_eval do
+            def resolve(scope)
+              $spy.context = context
+              super
+            end
+          end
+          schema!
+        end
+
+        after do
+          $spy = nil
+          Graphiti.context = {}
+        end
+
+        it "is used" do
+          run(%|
+            query {
+              employees {
+                nodes {
+                  id
+                }
+              }
+            }
+          |)
+          expect($spy.context).to eq(foo: "bar")
+        end
+
+        context "but manually supplied" do
+          it "chooses manual" do
+            run(%|
+              query {
+                employees {
+                  nodes {
+                    id
+                  }
+                }
+              }
+            |, {}, { bar: "baz" })
+            expect($spy.context).to eq(bar: "baz")
+          end
+        end
+      end
+    end
   end
 end
