@@ -12,9 +12,27 @@ module GraphitiGql
         :stats
 
       if defined?(RSpec)
-        let(:params) { {} }
+        let(:params) do
+          fields = []
+          resource.attributes.each_pair do |name, config|
+            (fields << name) if config[:readable]
+          end
+          { fields: fields }
+        end
         let(:resource) { described_class }
         let(:ctx) { {} }
+
+        def self.only_fields(*fields)
+          before do
+            fields.each { |f| params[:fields].select! { |p| p == f } }
+          end
+        end
+
+        def self.except_fields(*fields)
+          before do
+            fields.each { |f| params[:fields].reject! { |p| p == f } }
+          end
+        end
       end
     end
 
