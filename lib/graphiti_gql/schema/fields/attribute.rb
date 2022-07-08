@@ -38,7 +38,7 @@ module GraphitiGql
 
             value = if _config[:proc]
               if _sideload
-                instance_exec(edge_attrs, &_config[:proc])
+                instance_exec(edge_attrs, object.node, &_config[:proc])
               else
                 instance_eval(&_config[:proc])
               end

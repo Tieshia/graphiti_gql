@@ -42,24 +42,41 @@ module GraphitiGql
         end
 
         def build_customized_edge_type(sideload_type)
-          # build the edge class
-          prior_edge_class = sideload_type.edge_type_class
-          edge_class = Class.new(prior_edge_class)
+          edge_type_class = build_edge_type_class(sideload_type)
+
+          # Build the sideload type with new edge class applied
+          if sideload_type.is_a?(Module)
+            klass = sideload_type
+            # There's some magic that happens when subclassing, but modules
+            # don't subclass. This is the kind of resetting we need to happen.
+            # Might be a graphql-ruby issue.
+            klass.instance_variable_set(:@connection_type, nil)
+            klass.instance_variable_set(:@edge_type, nil)
+            klass.edge_type_class(edge_type_class)
+            klass
+          else
+            klass = Class.new(sideload_type)
+            klass.edge_type_class(edge_class)
+            klass
+          end
+        end
+
+        def build_edge_type_class(sideload_type)
+          prior_edge_type_class = sideload_type.edge_type_class
+          edge_type_class = Class.new(prior_edge_type_class)
           edge_resource = @sideload.class.edge_resource
           edge_resource.attributes.each_pair do |name, config|
             next if name == :id
-            Schema::Fields::Attribute.new(name, config, @sideload).apply(edge_class)
+            Schema::Fields::Attribute.new(name, config, @sideload).apply(edge_type_class)
           end
           registered_parent = Schema.registry.get(@sideload.parent_resource.class)
           parent_name = registered_parent[:type].graphql_name
-          edge_class.define_method :graphql_name do
-            "#{parent_name}To#{sideload_type.graphql_name}Edge"
+          edge_type_class_name = "#{parent_name}To#{sideload_type.graphql_name}Edge"
+          edge_type_class.define_method :graphql_name do
+            edge_type_class_name
           end
-
-          # build the sideload type with new edge class applied
-          klass = Class.new(sideload_type)
-          klass.edge_type_class(edge_class)
-          klass
+          edge_type_class.graphql_name(edge_type_class_name)
+          edge_type_class
         end
       end
     end

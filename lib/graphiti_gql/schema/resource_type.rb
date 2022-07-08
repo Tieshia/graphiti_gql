@@ -34,14 +34,19 @@ module GraphitiGql
 
       private
 
-      def process_polymorphic_parent(type)
+      def process_polymorphic_parent(interface_type)
+        registry_name = registry.key_for(@resource, interface: false)
+        type = Class.new(Schema.base_object)
+        type.graphql_name(registry_name)
+        type.implements(interface_type)
+
         # Define the actual class that implements the interface
         registry.set(@resource, type, interface: false)
         @resource.children.each do |child|
           if (registered = registry.get(child))
-            registered[:type].implements(type)
+            registered[:type].implements(interface_type)
           else
-            self.class.new(child, implements: type).build
+            self.class.new(child, implements: interface_type).build
           end
         end
       end

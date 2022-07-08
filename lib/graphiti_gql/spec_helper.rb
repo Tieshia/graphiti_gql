@@ -24,6 +24,7 @@ module GraphitiGql
         :errors,
         :error_messages,
         :nodes,
+        :node,
         :stats
 
       Graphiti::Resource.send(:prepend, ScopeTrackable)
@@ -42,20 +43,20 @@ module GraphitiGql
         def self.except_fields(*fields)
           let(:except_fields) { fields }
         end
-      end
-    end
 
-    def fields
-      fields = []
-      resource.attributes.each_pair do |name, config|
-        (fields << name) if config[:readable]
+        let(:fields) do
+          fields = []
+          resource.attributes.each_pair do |name, config|
+            (fields << name) if config[:readable]
+          end
+          if respond_to?(:only_fields) && only_fields.present?
+            fields.select! { |f| only_fields.include?(f) }
+          elsif respond_to?(:except_fields) && except_fields.present?
+            fields.reject! { |f| except_fields.include?(f) }
+          end
+          fields
+        end
       end
-      if respond_to?(:only_fields) && only_fields.present?
-        fields.select! { |f| only_fields.include?(f) }
-      elsif respond_to?(:except_fields) && except_fields.present?
-        fields.reject! { |f| except_fields.include?(f) }
-      end
-      fields
     end
 
     def gql_datetime(timestamp, precise = false)
@@ -67,11 +68,8 @@ module GraphitiGql
     end
 
     def proxy
-      resource.gql(params.merge(fields: fields), ctx)
-    end
-
-    def query
-      proxy.query
+      q = defined?(query) ? query : nil
+      resource.gql(params.merge(fields: fields), ctx, q)
     end
 
     def run

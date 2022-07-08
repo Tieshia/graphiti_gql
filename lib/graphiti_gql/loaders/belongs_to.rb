@@ -42,6 +42,7 @@ module GraphitiGql
             params = {
               filter: { id: { eq: value.join(",") } }
             }
+
             futures << Concurrent::Future.execute do
                { type: key, data: klass.resource.class.all(params).data }
             end

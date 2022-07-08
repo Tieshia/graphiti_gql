@@ -19,8 +19,11 @@ module GraphitiGql
       def add_join_table_magic(proxy)
         if defined?(ActiveRecord) && proxy.resource.model.ancestors.include?(ActiveRecord::Base)
           thru = @sideload.foreign_key.keys.first
-          thru_model = proxy.resource.model.reflect_on_association(thru).klass
+          reflection = @sideload.parent_resource.model.reflect_on_association(thru)
+          thru_model = reflection.klass
+
           names = thru_model.column_names.map do |n|
+            next if n == :id
             "#{thru_model.table_name}.#{n} as _edge_#{n}"
           end
           scope = proxy.scope.object

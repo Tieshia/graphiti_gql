@@ -143,22 +143,41 @@ module GraphitiGql
   Graphiti::Scoping::Paginate.send(:prepend, PaginateExtras)
 
   module ManyToManyExtras
-    extend ActiveSupport::Concern
+    def self.prepended(klass)
+      klass.class_eval do
+        class << self
+          attr_accessor :edge_resource
 
-    class_methods do
-      attr_accessor :edge_resource
-
-      def attribute(*args, &blk)
-        @edge_resource = Class.new(Graphiti::Resource) do
-          def self.abstract_class?
-            true
+          def attribute(*args, &blk)
+            @edge_resource ||= Class.new(Graphiti::Resource) do
+              def self.abstract_class?
+                true
+              end
+            end
+            @edge_resource.attribute(*args, &blk)
           end
         end
-        @edge_resource.attribute(*args, &blk)
+      end
+    end
+
+    def apply_belongs_to_many_filter
+      super
+      self_ref = self
+      fk_type = parent_resource_class.attributes[:id][:type]
+      fk_type = :hash if polymorphic?
+      filters = resource_class.config[:filters]
+
+      # Keep the options, apply the eq proc
+      if (filter = filters[inverse_filter.to_sym])
+        if filter[:operators][:eq].nil?
+          filter[:operators][:eq] = proc do |scope, value|
+            self_ref.belongs_to_many_filter(scope, value)
+          end
+        end
       end
     end
   end
-  Graphiti::Sideload::ManyToMany.send(:include, ManyToManyExtras)
+  Graphiti::Sideload::ManyToMany.send(:prepend, ManyToManyExtras)
 
   module StatsExtras
     def calculate_stat(name, function)
