@@ -17,6 +17,8 @@ module GraphitiGql
                   Node.new(edge.except(:node).merge(node_id: node_id))
                 end
                 hash[key] = value[:edges].map { |v| Node.new(v[:node], sideload.resource.class) }
+              elsif value.key?(:nodes)
+                hash[key] = value[:nodes].map { |n| Node.new(n, sideload.resource.class) }
               else
                 hash[key] = Node.new(value, sideload.resource.class)
               end
@@ -115,8 +117,9 @@ module GraphitiGql
         return @query if @query
 
         name = Schema.registry.key_for(@resource)
-        filter_bang = "!" if @resource.filters.values.any? { |f| f[:required] }
         sortvar = "$sort: [#{name}Sort!]," if @resource.sorts.any?
+        filter_bang = "!" if @resource.filters.values.any? { |f| f[:required] }
+        filtervar = "$filter: #{name}Filter#{filter_bang}," if @resource.filters.any?
 
         if !(fields = @params[:fields])
           fields = []
@@ -127,7 +130,7 @@ module GraphitiGql
 
         q = %|
           query #{name} (
-            $filter: #{name}Filter#{filter_bang},
+            #{filtervar}
             #{sortvar}
             $first: Int,
             $last: Int,
@@ -135,7 +138,7 @@ module GraphitiGql
             $after: String,
           ) {
             #{@resource.graphql_entrypoint} (
-              filter: $filter,
+              #{ 'filter: $filter,' if filtervar }
               #{ 'sort: $sort,' if sortvar }
               first: $first,
               last: $last,
