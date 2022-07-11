@@ -849,6 +849,40 @@ RSpec.describe GraphitiGql do
                   })
                 end
               end
+
+              context "on a many-to-many" do
+                before do
+                  team_resource = Class.new(PORO::TeamResource) do
+                    def self.name;"PORO::TeamResource";end
+                  end
+                  team_resource.filter :employee_id, required: true
+                  resource.many_to_many :teams,
+                    foreign_key: {employee_teams: :employee_id},
+                    resource: team_resource
+                  schema!
+                end
+
+                it "works" do
+                  json = run(%|
+                    query {
+                      employees(filter: { foo: { eq: "Stephen" }}) {
+                        nodes {
+                          teams {
+                            nodes {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                  |)
+                  expect(json).to eq({
+                    employees: {
+                      nodes: [{ teams: { nodes: [] } }]
+                    }
+                  })
+                end
+              end
             end
           end
 

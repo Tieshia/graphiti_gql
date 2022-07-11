@@ -23,12 +23,15 @@ module GraphitiGql
         Registry.instance
       end
 
+      # TODO - when no sorts schema error, when no filters schema error
       def define_filters(field)
         filter_type = generate_filter_type(field)
         required = @resource.filters.any? { |name, config|
           value = !!config[:required]
           if @sideload
-            value && @sideload.foreign_key != name
+            fk = @sideload.foreign_key
+            fk = fk.values.first if fk.is_a?(Hash)
+            value && fk != name
           else
             value
           end
