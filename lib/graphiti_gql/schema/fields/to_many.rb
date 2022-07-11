@@ -4,11 +4,8 @@ module GraphitiGql
       class ToMany
         def initialize(sideload, sideload_type)
           @sideload = sideload
-          @sideload_type = if customized_edge?
-              build_customized_edge_type(sideload_type)
-            else
-              sideload_type
-            end
+          @sideload_type = sideload_type
+          @connection_type = find_or_build_connection
         end
 
         def apply(type)
@@ -18,7 +15,7 @@ module GraphitiGql
             extras: [:lookahead]
           }
           opts[:extensions] = [RelayConnectionExtension] unless has_one?
-          field_type = has_one? ? @sideload_type : @sideload_type.connection_type
+          field_type = has_one? ? @sideload_type : @connection_type
           field = type.field @sideload.name,
             field_type,
             **opts
@@ -41,23 +38,20 @@ module GraphitiGql
           @sideload.type == :many_to_many && @sideload.class.edge_resource
         end
 
-        def build_customized_edge_type(sideload_type)
-          edge_type_class = build_edge_type_class(sideload_type)
-
-          # Build the sideload type with new edge class applied
-          if sideload_type.is_a?(Module)
-            klass = sideload_type
-            # There's some magic that happens when subclassing, but modules
-            # don't subclass. This is the kind of resetting we need to happen.
-            # Might be a graphql-ruby issue.
-            klass.instance_variable_set(:@connection_type, nil)
-            klass.instance_variable_set(:@edge_type, nil)
-            klass.edge_type_class(edge_type_class)
+        def find_or_build_connection
+          if customized_edge?
+            prior = @sideload_type.connection_type
+            klass = Class.new(prior)
+            registered_parent = Schema.registry.get(@sideload.parent_resource.class)
+            parent_name = registered_parent[:type].graphql_name
+            name = "#{parent_name}To#{@sideload_type.graphql_name}Connection"
+            klass.graphql_name(name)
+            edge_type_class = build_edge_type_class(@sideload_type)
+            edge_type_class.node_type(prior.node_type)
+            klass.edge_type(edge_type_class)
             klass
           else
-            klass = Class.new(sideload_type)
-            klass.edge_type_class(edge_class)
-            klass
+            @sideload_type.connection_type
           end
         end
 

@@ -162,6 +162,7 @@ module GraphitiGql
 
     def apply_belongs_to_many_filter
       super
+      return unless respond_to?(:belongs_to_many_filter) # activerecord
       self_ref = self
       fk_type = parent_resource_class.attributes[:id][:type]
       fk_type = :hash if polymorphic?
