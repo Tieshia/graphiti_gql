@@ -39,16 +39,19 @@ module GraphitiGql
         end
 
         def find_or_build_connection
+          registered_parent = Schema.registry.get(@sideload.parent_resource.class)
+          parent_name = registered_parent[:type].graphql_name
+          name = "#{parent_name}To#{@sideload_type.graphql_name}Connection"
+          return Schema.registry[name][:type] if Schema.registry[name]
+
           if customized_edge?
             prior = @sideload_type.connection_type
             klass = Class.new(prior)
-            registered_parent = Schema.registry.get(@sideload.parent_resource.class)
-            parent_name = registered_parent[:type].graphql_name
-            name = "#{parent_name}To#{@sideload_type.graphql_name}Connection"
             klass.graphql_name(name)
             edge_type_class = build_edge_type_class(@sideload_type)
             edge_type_class.node_type(prior.node_type)
             klass.edge_type(edge_type_class)
+            Schema.registry[name] = { type: klass }
             klass
           else
             @sideload_type.connection_type
