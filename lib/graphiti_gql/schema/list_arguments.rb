@@ -36,6 +36,7 @@ module GraphitiGql
             value
           end
         }
+        required = true if @resource.grouped_filters.any? && !@sideload
         field.argument :filter, filter_type, required: required
       end
     
@@ -46,11 +47,18 @@ module GraphitiGql
         end
         klass = Class.new(GraphQL::Schema::InputObject)
         klass.graphql_name type_name
+        required_via_group = []
+        if (group = @resource.grouped_filters).present?
+          if group[:required] == :all
+            required_via_group = group[:names].map(&:to_sym)
+          end
+        end
         @resource.filters.each_pair do |name, config|
           attr_type = generate_filter_attribute_type(type_name, name, config)
+          required = !!config[:required] || required_via_group.include?(name)
           klass.argument name.to_s.camelize(:lower),
             attr_type,
-            required: !!config[:required]
+            required: required
         end
         registry[type_name] = { type: klass }
         klass

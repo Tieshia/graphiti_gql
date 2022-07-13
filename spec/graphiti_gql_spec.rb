@@ -908,6 +908,94 @@ RSpec.describe GraphitiGql do
           end
         end
 
+        context "when a filter group is present" do
+          before do
+            resource.filter_group [:id, :first_name], required: required
+            schema!
+          end
+
+          context "and required: :any" do
+            let(:required) { :any }
+
+            context "and no filter is passed" do
+              it "raises schema error" do
+                json = run(%|
+                  query {
+                    employees {
+                      nodes {
+                        id
+                      }
+                    }
+                  }
+                |)
+                expect(json[:errors][0][:message])
+                  .to eq("Field 'employees' is missing required arguments: filter")
+              end
+
+              it "does not mark individial fields as required in the schema" do
+                field = GraphitiGql.schema.query.fields["employees"]
+                id = field.arguments["filter"].type.of_type.arguments["id"]
+                expect(id.type).to_not be_non_null
+              end
+            end
+
+            context "but it is requested as relationship" do
+              before do
+                position_resource.belongs_to :employee, resource: resource
+                schema!
+              end
+
+              it "does not raise schema error" do
+                json = run(%|
+                  query {
+                    positions {
+                      nodes {
+                        employee {
+                          id
+                        }
+                      }
+                    }
+                  }
+                |)
+                expect(json).to eq(positions: { nodes: [] })
+              end
+            end
+          end
+
+          context "and required: :all" do
+            let(:required) { :all }
+
+            it "marks all fields as required in the schema" do
+              field = GraphitiGql.schema.query.fields["employees"]
+              id = field.arguments["filter"].type.of_type.arguments["id"]
+              expect(id.type).to be_non_null
+            end
+
+            context "but it is requested as relationship" do
+              before do
+                position_resource.belongs_to :employee, resource: resource
+                schema!
+              end
+
+              # Could be passed in params block, so don't require anything
+              it "does not raise schema error" do
+                json = run(%|
+                  query {
+                    positions {
+                      nodes {
+                        employee {
+                          id
+                        }
+                      }
+                    }
+                  }
+                |)
+                expect(json).to eq(positions: { nodes: [] })
+              end
+            end
+          end
+        end
+
         context "when custom type" do
           let!(:findme) do
             PORO::Employee.create(id: 999, first_name: "custom!")

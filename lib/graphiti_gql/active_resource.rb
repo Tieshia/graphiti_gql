@@ -118,7 +118,7 @@ module GraphitiGql
 
         name = Schema.registry.key_for(@resource)
         sortvar = "$sort: [#{name}Sort!]," if @resource.sorts.any?
-        filter_bang = "!" if @resource.filters.values.any? { |f| f[:required] }
+        filter_bang = "!" if @resource.grouped_filters.any? || @resource.filters.values.any? { |f| f[:required] }
         filtervar = "$filter: #{name}Filter#{filter_bang}," if @resource.filters.any?
 
         if !(fields = @params[:fields])
