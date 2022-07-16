@@ -72,10 +72,12 @@ module GraphitiGql
       resource.gql(params.merge(fields: fields), ctx, q)
     end
 
+
     def run
       lambda do
-        proxy.to_h
-        proxy
+        instance = proxy
+        instance.to_h
+        instance
       end
     end
 
