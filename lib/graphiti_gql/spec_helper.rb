@@ -69,7 +69,9 @@ module GraphitiGql
 
     def proxy
       q = defined?(query) ? query : nil
-      resource.gql(params.merge(fields: fields), ctx, q)
+      with_pagination = respond_to?(:with_pagination) ? send(:with_pagination) : false
+      opts = { with_pagination: with_pagination }
+      resource.gql(params.merge(fields: fields), ctx, q, opts)
     end
 
 

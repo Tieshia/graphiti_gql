@@ -47,7 +47,7 @@ module GraphitiGql
     end
 
     class Proxy
-      def initialize(resource, params, ctx, query)
+      def initialize(resource, params, ctx, query, options = {})
         @query = query
         @resource = resource
         @ctx = ctx
@@ -56,6 +56,7 @@ module GraphitiGql
           sort[:att] = sort[:att].to_s.camelize(:lower)
           sort[:dir] = sort[:dir].to_s
         end
+        @with_pagination = !!options[:with_pagination]
       end
 
       def to_h(symbolize_keys: true)
@@ -76,7 +77,7 @@ module GraphitiGql
         else
           data[data.keys.first][:nodes] || []
         end
-        elements.map { |n| Node.new(underscore(n), @resource) }
+        elements.compact.map { |n| Node.new(underscore(n), @resource) }
       end
       alias :to_a :nodes
 
@@ -207,15 +208,18 @@ module GraphitiGql
           end
         end
   
-        q << %|
-                }
-              }
-              pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
-              }|
+          q << %|
+                  }
+                }|
+        if @with_pagination
+          q << %|
+                pageInfo {
+                  startCursor
+                  endCursor
+                  hasNextPage
+                  hasPreviousPage
+                }|
+        end
 
         if @params[:stats]
           q << %|
@@ -251,8 +255,8 @@ module GraphitiGql
     end
 
     class_methods do
-      def gql(params = {}, ctx = {}, query = nil)
-        Proxy.new(self, params, ctx, query)
+      def gql(params = {}, ctx = {}, query = nil, opts = {})
+        Proxy.new(self, params, ctx, query, opts)
       end
     end
   end
