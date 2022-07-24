@@ -11,7 +11,9 @@ module GraphitiGql
             @registered[:type],
             null: true,
             extras: [:lookahead]
-          field.argument(:id, String, required: true)
+          unless @registered[:resource].singular
+            field.argument(:id, String, required: true)
+          end
           _registered = @registered
           query.define_method name do |**arguments|
             params = Util.params_from_args(arguments)

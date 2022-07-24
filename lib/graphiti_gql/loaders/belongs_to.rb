@@ -53,11 +53,18 @@ module GraphitiGql
             fulfill(id, val[:data][0])
           end
         else
-          params = {filter: {id: {eq: ids.join(",")}}}
           resource = Schema.registry.get(@sideload.resource.class)[:resource]
+          params = {}
+          unless resource.singular
+            params[:filter] = {id: { eq: ids.join(",") } }
+          end
           records = resource.all(params).data
-          map = records.index_by { |record| record.id }
-          ids.each { |id| fulfill(id, map[id]) }
+          if resource.singular
+            ids.each { |id| fulfill(id, records[0]) }
+          else
+            map = records.index_by { |record| record.id }
+            ids.each { |id| fulfill(id, map[id]) }
+          end
         end
       end
     end

@@ -57,7 +57,7 @@ module GraphitiGql
         elsif @sideload.type == :many_to_many
           fk = @sideload.foreign_key.values.first
           @params[:filter].merge!(fk => { eq: ids.join(",") })
-        else
+        elsif !@sideload.parent_resource.class.singular
           @params[:filter].merge!(@sideload.foreign_key => { eq: ids.join(",") })
         end
 

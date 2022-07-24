@@ -195,6 +195,103 @@ RSpec.describe GraphitiGql do
             .to eq("Field 'employee' doesn't exist on type 'Query'")
         end
       end
+
+      context "when resource is singular" do
+        before do
+          resource.singular = true
+          schema!
+        end
+
+        it "does not accept id argument" do
+          json = run(%(
+            query {
+              employee(id: "1") {
+                firstName
+              }
+            }
+          ))
+
+          expect(json[:errors][0][:message])
+            .to eq("Field 'employee' doesn't accept argument 'id'")
+        end
+
+        it "does not accept filter argument" do
+          json = run(%(
+            query {
+              employee(filter: { id: { eq: "1" } }) {
+                firstName
+              }
+            }
+          ))
+          expect(json[:errors][0][:message])
+            .to eq("Field 'employee' doesn't accept argument 'filter'")
+        end
+
+        it "works" do
+          json = run(%(
+            query {
+              employee {
+                firstName
+              }
+            }
+          ))
+          expect(json).to eq({
+            employee: {
+              firstName: "Stephen"
+            }
+          })
+        end
+
+        context "and loaded as a belongs_to" do
+          before do
+            PORO::Position.create(employee_id: employee2.id)
+            position_resource.belongs_to :single_employee,
+              resource: resource
+            schema!
+          end
+
+          it "works" do
+            json = run(%(
+              query {
+                positions {
+                  nodes {
+                    singleEmployee {
+                      firstName
+                    }
+                  }
+                }
+              }
+            ))
+            # NB - Stephen not Agatha, even though FK is Agatha
+            expect(json).to eq({
+              positions: {
+                nodes: [
+                  {
+                    singleEmployee: {
+                      firstName: "Stephen"
+                    }
+                  }
+                ]
+              }
+            })
+          end
+
+          it "does not try to filter on foreign key" do
+            expect(resource).to receive(:all).with({}).and_call_original
+            json = run(%(
+              query {
+                positions {
+                  nodes {
+                    singleEmployee {
+                      firstName
+                    }
+                  }
+                }
+              }
+            ))
+          end
+        end
+      end
     end
 
     describe "fetching lists" do
