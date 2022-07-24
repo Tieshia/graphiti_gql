@@ -13,10 +13,14 @@ module GraphitiGql
             if (sideload = resource.sideload(key))
               if value.key?(:edges) 
                 @edges[key] = value[:edges].map do |edge|
-                  node_id = edge[:node][:id]
+                  node_id = edge[:node][:id] if edge[:node]
                   Node.new(edge.except(:node).merge(node_id: node_id))
                 end
-                hash[key] = value[:edges].map { |v| Node.new(v[:node], sideload.resource.class) }
+                if value[:edges].any? { |e| e[:node] }
+                  hash[key] = value[:edges].map { |v| Node.new(v[:node], sideload.resource.class) }
+                else
+                  hash[key] = value[:edges]
+                end
               elsif value.key?(:nodes)
                 hash[key] = value[:nodes].map { |n| Node.new(n, sideload.resource.class) }
               else
@@ -59,15 +63,19 @@ module GraphitiGql
         @with_pagination = !!options[:with_pagination]
       end
 
-      def to_h(symbolize_keys: true)
+      def run!(symbolize_keys: true)
         result = GraphitiGql.run(query, @params, @ctx)
         result = result.deep_symbolize_keys if symbolize_keys
         @response = result
         result
       end
 
-      def node(id)
-        nodes.find { |n| n.id == id.to_s }
+      def node(id = nil)
+        if @resource.singular
+          Node.new(underscore(data[data.keys.first]), @resource)
+        else
+          nodes.find { |n| n.id == id.to_s }
+        end
       end
 
       def nodes
@@ -82,7 +90,7 @@ module GraphitiGql
       alias :to_a :nodes
 
       def response
-        @response ||= to_h
+        @response ||= run!
       end
 
       def data

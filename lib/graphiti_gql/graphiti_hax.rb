@@ -2,13 +2,38 @@
 # Ideally we eventually rip out the parts of Graphiti we need and roll this into
 # that effort.
 module GraphitiGql
+  module RunnerExtras
+    def jsonapi_resource
+      @jsonapi_resource ||= begin
+        r = @resource_class.new
+        r.instance_variable_set(:@params, @params)
+        r
+      end
+    end
+  end
+  Graphiti::Runner.send(:prepend, RunnerExtras)
+
   module ResourceExtras
     extend ActiveSupport::Concern
 
     included do
       class << self
-        attr_accessor :graphql_name
+        attr_accessor :graphql_name, :singular
       end
+    end
+
+    def filterings
+      @filterings ||= begin
+        if @params.key?(:filter)
+          @params[:filter].keys
+        else
+          []
+        end
+      end
+    end
+
+    def parent_field
+      context[:current_arguments][:lookahead].field.owner
     end
 
     def selections
@@ -40,6 +65,14 @@ module GraphitiGql
           att[:deprecation_reason] = opts[:deprecation_reason]
           att[:null] = opts.key?(:null) ? opts[:null] : args[0] != :id
           att[:name] = args.first # for easier lookup
+        end
+      end
+
+      def filter_group(filter_names, *args)
+        if filter_names.blank?
+          config[:grouped_filters] = {}
+        else
+          super
         end
       end
     end
@@ -145,8 +178,10 @@ module GraphitiGql
   module ManyToManyExtras
     def self.prepended(klass)
       klass.class_eval do
+        attr_reader :join_table_alias, :edge_magic
+
         class << self
-          attr_accessor :edge_resource
+          attr_reader :edge_resource
 
           def attribute(*args, &blk)
             @edge_resource ||= Class.new(Graphiti::Resource) do
@@ -158,6 +193,12 @@ module GraphitiGql
           end
         end
       end
+    end
+    
+    def initialize(name, opts = {})
+      @join_table_alias = opts[:join_table_alias]
+      @edge_magic = opts[:edge_magic] == false ? false : true
+      super
     end
 
     def apply_belongs_to_many_filter

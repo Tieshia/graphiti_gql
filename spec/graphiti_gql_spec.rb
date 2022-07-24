@@ -1006,6 +1006,8 @@ RSpec.describe GraphitiGql do
         end
 
         context "when a filter group is present" do
+          let(:required) { :all }
+
           before do
             resource.filter_group [:id, :first_name], required: required
             schema!
@@ -1089,6 +1091,26 @@ RSpec.describe GraphitiGql do
                 |)
                 expect(json).to eq(positions: { nodes: [] })
               end
+            end
+          end
+
+          context "and then unset with nil" do
+            before do
+              resource.filter_group nil
+            end
+
+            it "correctly unsets" do
+              expect(resource.config[:grouped_filters]).to eq({})
+            end
+          end
+
+          context "and then unset with empty array" do
+            before do
+              resource.filter_group []
+            end
+
+            it "correctly unsets" do
+              expect(resource.config[:grouped_filters]).to eq({})
             end
           end
         end
@@ -1858,6 +1880,45 @@ RSpec.describe GraphitiGql do
             |)
             expect(json[:errors][0][:message])
               .to eq("InputObject 'POROPositionFilter' doesn't accept argument 'employee_id'")
+          end
+
+          context "when foreign key is aliased" do
+            before do
+              position2.update_attributes(emp_id: employee2.id)
+              position_resource
+                .attribute :employee_id, :integer, alias: :emp_id
+              schema!
+            end
+
+            it "is respected" do
+              json = run(%|
+                query {
+                  employees {
+                    nodes {
+                      positions {
+                        nodes {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              |)
+              expect(json).to eq({
+                employees: {
+                  nodes: [
+                    { positions: { nodes: [] } },
+                    {
+                      positions: {
+                        nodes: [
+                          { id: position2.id.to_s }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              })
+            end
           end
 
           context "when the relationship has no data" do
@@ -5209,6 +5270,135 @@ RSpec.describe GraphitiGql do
               .to eq([:id, :name])
             expect($spy.team_selections)
               .to eq([:name, :__typename])
+          end
+        end
+      end
+    end
+
+    describe "Resource#filterings" do
+      before do
+        position_resource.class_eval do
+          class << self;attr_accessor :spy_filterings;end
+          alias :original_base_scope :base_scope
+          def base_scope
+            self.class.spy_filterings = filterings
+            original_base_scope
+          end
+        end
+        schema!
+      end
+
+      it "reflects the filters passed to .all" do
+        run(%|
+          query {
+            positions(
+              filter: {
+                title: { eq: "foo" },
+                rank: { gt: 10 }
+              }) {
+              nodes {
+                id
+              }
+            }
+          }
+        |)
+        expect(position_resource.spy_filterings)
+          .to match_array([:title, :rank])
+      end
+
+      context "when loading as relationship" do
+        it "contains under-the-hood filters" do
+          run(%|
+            query {
+              employees {
+                nodes {
+                  positions {
+                    nodes {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          |)
+          expect(position_resource.spy_filterings)
+            .to match_array([:employee_id])
+        end
+
+        context "and also given runtime filters" do
+          it "merges them in" do
+            run(%|
+              query {
+                employees {
+                  nodes {
+                    positions(
+                      filter: {
+                        title: { eq: "asdf" },
+                        rank: { gt: 10 }
+                      }
+                    ) {
+                      nodes {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            |)
+            expect(position_resource.spy_filterings)
+              .to match_array([:employee_id, :title, :rank])
+          end
+        end
+      end
+    end
+
+    describe "Resource#parent_field" do
+      before do
+        position_resource.class_eval do
+          class << self;attr_accessor :spy_parent_field;end
+          alias :original_base_scope :base_scope
+          def base_scope
+            self.class.spy_parent_field = parent_field
+            original_base_scope
+          end
+        end
+        schema!
+      end
+
+      context "when loaded top-level" do
+        it "is Query" do
+          json = run(%|
+            query {
+              positions {
+                nodes {
+                  id
+                }
+              }
+            }
+          |)
+          spy = position_resource.spy_parent_field
+          expect(spy <= GraphQL::Schema::Object).to eq(true)
+          expect(spy.graphql_name).to eq('Query')
+        end
+
+        context "when loaded as relationship" do
+          it "returns the parent GQL field" do
+            json = run(%|
+              query {
+                employees {
+                  nodes {
+                    positions {
+                      nodes {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            |)
+            spy = position_resource.spy_parent_field
+            expect(spy <= GraphQL::Schema::Object).to eq(true)
+            expect(spy.graphql_name).to eq('POROEmployee')
           end
         end
       end

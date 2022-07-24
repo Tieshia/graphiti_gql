@@ -78,7 +78,7 @@ module GraphitiGql
     def run
       lambda do
         instance = proxy
-        instance.to_h
+        instance.run!
         instance
       end
     end
@@ -89,6 +89,10 @@ module GraphitiGql
 
     def result
       @result ||= run!
+    end
+
+    def json
+      @json ||= result.response
     end
   end
 end

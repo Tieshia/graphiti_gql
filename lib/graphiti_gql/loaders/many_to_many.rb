@@ -17,14 +17,16 @@ module GraphitiGql
       private
 
       def add_join_table_magic(proxy)
+        return unless @sideload.edge_magic
         if defined?(ActiveRecord) && proxy.resource.model.ancestors.include?(ActiveRecord::Base)
           thru = @sideload.foreign_key.keys.first
           reflection = @sideload.parent_resource.model.reflect_on_association(thru)
           thru_model = reflection.klass
 
+          thru_table_name = @sideload.join_table_alias || thru_model.table_name
           names = thru_model.column_names.map do |n|
             next if n == :id
-            "#{thru_model.table_name}.#{n} as _edge_#{n}"
+            "#{thru_table_name}.#{n} as _edge_#{n}"
           end
           scope = proxy.scope.object
           scope = scope.select(["#{proxy.resource.model.table_name}.*"] + names)
