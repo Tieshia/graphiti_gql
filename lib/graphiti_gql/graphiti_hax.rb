@@ -68,6 +68,14 @@ module GraphitiGql
         end
       end
 
+      def filter(name, *args, &blk)
+        super
+        opts = args.extract_options!
+        if opts[:if]
+          attributes[name][:filterable] = opts[:if]
+        end
+      end
+
       def filter_group(filter_names, *args)
         if filter_names.blank?
           config[:grouped_filters] = {}

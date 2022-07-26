@@ -763,43 +763,97 @@ RSpec.describe GraphitiGql do
         end
 
         context "when filter is guarded" do
-          context "and guard does not pass" do
-            it "returns error" do
-              do_run = lambda do
-                run(%|
+          context "via .attribute :filterable option" do
+            context "and guard does not pass" do
+              it "returns error" do
+                do_run = lambda do
+                  run(%|
+                    query {
+                      employees(filter: { guardedFirstName: { eq: "Agatha" } }) {
+                        nodes {
+                          id
+                          firstName
+                        }
+                      }
+                    }
+                  |)
+                end
+                expect(&do_run)
+                  .to raise_error(Graphiti::Errors::InvalidAttributeAccess, /guarded_first_name/)
+              end
+            end
+
+            context "and guard passes" do
+              it "works as normal" do
+                json = run(%|
                   query {
                     employees(filter: { guardedFirstName: { eq: "Agatha" } }) {
                       nodes {
-                        id
                         firstName
                       }
                     }
                   }
-                |)
+                |, {}, { current_user: "admin" })
+                expect(json).to eq({
+                  employees: {
+                    nodes: [{
+                      firstName: "Agatha"
+                    }]
+                  }
+                })
               end
-              expect(&do_run)
-                .to raise_error(Graphiti::Errors::InvalidAttributeAccess, /guarded_first_name/)
             end
           end
 
-          context "and guard passes" do
-            it "works as normal" do
-              json = run(%|
-                query {
-                  employees(filter: { guardedFirstName: { eq: "Agatha" } }) {
-                    nodes {
-                      firstName
+          context "via .filter :if option" do
+            before do
+              resource.filter :foo, :string, if: :admin? do
+                eq do |scope, value|
+                  scope[:conditions] ||= {}
+                  scope[:conditions][:first_name] = value
+                  scope
+                end
+              end
+              schema!
+            end
+
+            context "and the guard passes" do
+              it "works" do
+                json = run(%|
+                  query {
+                    employees(filter: { foo: { eq: "Agatha" } }) {
+                      nodes {
+                        firstName
+                      }
                     }
                   }
-                }
-              |, {}, { current_user: "admin" })
-              expect(json).to eq({
-                employees: {
-                  nodes: [{
-                    firstName: "Agatha"
-                  }]
-                }
-              })
+                |, {}, { current_user: "admin" })
+                expect(json).to eq({
+                  employees: {
+                    nodes: [{
+                      firstName: "Agatha"
+                    }]
+                  }
+                })
+              end
+            end
+
+            context "and the guard fails" do
+              it "raises error" do
+                do_run = lambda do
+                  run(%|
+                    query {
+                      employees(filter: { foo: { eq: "Agatha" } }) {
+                        nodes {
+                          firstName
+                        }
+                      }
+                    }
+                  |, {})
+                end
+                expect(&do_run) 
+                  .to raise_error(Graphiti::Errors::InvalidAttributeAccess)
+              end
             end
           end
         end
