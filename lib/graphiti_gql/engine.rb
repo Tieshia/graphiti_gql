@@ -18,7 +18,6 @@ module GraphitiGql
     end
 
     initializer "graphiti_gql.define_controller" do
-      require "#{Rails.root}/app/controllers/application_controller"
       app_controller = GraphitiGql.config.application_controller || ::ApplicationController
       app_controller.send(:include, ControllerContext)
 
