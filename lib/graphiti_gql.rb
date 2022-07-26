@@ -53,16 +53,8 @@ module GraphitiGql
     yield config
   end
 
-  def self.entrypoints=(val)
-    @entrypoints = val
-  end
-
-  def self.entrypoints
-    @entrypoints
-  end
-
   def self.entrypoint?(resource)
-    @entrypoints.nil? || @entrypoints.include?(resource)
+    !!resource.graphql_entrypoint
   end
 
   def self.run(query_string, variables = {}, context = {})

@@ -22,7 +22,7 @@ module GraphitiGql
 
       def define_entrypoints
         registry.resource_types.each do |registered|
-          if GraphitiGql.entrypoint?(registered[:resource])
+          if registered[:resource].graphql_entrypoint
             Fields::Index.new(registered).apply(@query_class)
             Fields::Show.new(registered).apply(@query_class)
           end

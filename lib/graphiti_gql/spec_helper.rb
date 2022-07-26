@@ -84,6 +84,7 @@ module GraphitiGql
     end
 
     def run!
+      @json = nil
       @result = run.call
     end
 

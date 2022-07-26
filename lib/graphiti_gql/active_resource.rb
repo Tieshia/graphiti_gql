@@ -26,6 +26,8 @@ module GraphitiGql
               else
                 hash[key] = Node.new(value, sideload.resource.class)
               end
+            else
+              hash[key] = Node.new(value)
             end
           end
         end

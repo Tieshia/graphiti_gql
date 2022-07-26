@@ -4554,15 +4554,10 @@ RSpec.describe GraphitiGql do
       end
     end
 
-    describe "when entrypoints defined" do
+    describe "when entrypoint disabled" do
       before do
-        @original = GraphitiGql.entrypoints
-        GraphitiGql.entrypoints = [PORO::PositionResource]
+        resource.graphql_entrypoint = false
         schema!
-      end
-
-      after do
-        GraphitiGql.entrypoints = @original
       end
 
       it "works only for defined entrypoints" do
