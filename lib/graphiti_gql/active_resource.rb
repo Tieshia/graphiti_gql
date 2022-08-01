@@ -201,9 +201,11 @@ module GraphitiGql
             if sideload_fields.blank?
               sideload_fields = @resource.sideload(inc.to_sym).resource.attributes.select { |_, config| config[:readable] }.map(&:first)
             end
+            sideload_fields = sideload_fields.map { |sf| sf.to_s.camelize(:lower) }
+            sideload_fields |= [:__typename]
             sideload_fields.each do |name|
               q << %|
-                    #{indent}#{name.to_s.camelize(:lower)}|
+                    #{indent}#{name}|
             end
 
             if to_one
