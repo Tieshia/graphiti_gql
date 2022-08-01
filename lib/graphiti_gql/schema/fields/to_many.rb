@@ -64,7 +64,7 @@ module GraphitiGql
           edge_resource = @sideload.class.edge_resource
           edge_resource.attributes.each_pair do |name, config|
             next if name == :id
-            Schema::Fields::Attribute.new(name, config, @sideload).apply(edge_type_class)
+            Schema::Fields::Attribute.new(edge_resource, name, config, @sideload).apply(edge_type_class)
           end
           registered_parent = Schema.registry.get(@sideload.parent_resource.class)
           parent_name = registered_parent[:type].graphql_name

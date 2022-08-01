@@ -1169,6 +1169,40 @@ RSpec.describe GraphitiGql do
           end
         end
 
+        context "when string_enum type" do
+          before do
+            resource.attribute :foo, :string_enum, allow: ['a', 'b'] do
+              object.first_name == "Stephen" ? "a" : "b"
+            end
+            schema!
+          end
+
+          it "is registered as an enum in the schema" do
+            type = GraphitiGql::Schema.registry['POROEmployee'][:type]
+            expect(type.fields["foo"].type.values.keys).to eq(%w(a b))
+          end
+
+          it "works" do
+            json = run(%|
+              query {
+                employees {
+                  nodes {
+                    foo
+                  }
+                }
+              }
+            |)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  { foo: "a" },
+                  { foo: "b" }
+                ]
+              }
+            })
+          end
+        end
+
         context "when custom type" do
           let!(:findme) do
             PORO::Employee.create(id: 999, first_name: "custom!")

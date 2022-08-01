@@ -90,7 +90,7 @@ module GraphitiGql
       def add_fields(type, resource)
         resource.attributes.each_pair do |name, config|
           if config[:readable]
-            Fields::Attribute.new(name, config).apply(type)
+            Fields::Attribute.new(@resource, name, config).apply(type)
           end
         end
       end
