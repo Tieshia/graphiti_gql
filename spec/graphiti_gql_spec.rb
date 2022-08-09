@@ -5081,6 +5081,110 @@ RSpec.describe GraphitiGql do
       end
     end
 
+    describe "Resource.before_query" do
+      before do
+        resource.class_eval do
+          class << self;attr_accessor :before_queries;end
+          def check1!
+            self.class.before_queries ||= []
+            self.class.before_queries << :check1!
+          end
+          def check2!
+            self.class.before_queries ||= []
+            self.class.before_queries << :check2!
+          end
+          def check3!
+            self.class.before_queries ||= []
+            self.class.before_queries << :check3!
+          end
+        end
+        resource.before_query :check1!
+        schema!
+      end
+
+      def run!
+        run(%|
+          query {
+            employees {
+              nodes {
+                id
+              }
+            }
+          }
+        |)
+      end
+
+      it "fires before the query" do
+        run!
+        expect(resource.before_queries).to eq([:check1!])
+      end
+
+      context "when if" do
+        before do
+          allow_any_instance_of(resource).to receive(:check2?) { pass }
+          resource.before_query :check2!, if: :check2?
+          schema!
+        end
+
+        context "and the check passes" do
+          let(:pass) { true }
+
+          it "works" do
+            run!
+            expect(resource.before_queries).to eq([:check1!, :check2!])
+          end
+        end
+
+        context "and the check fails" do
+          let(:pass) { false }
+
+          it "does not fire" do
+            run!
+            expect(resource.before_queries).to eq([:check1!])
+          end
+        end
+      end
+
+      context "when unless" do
+        before do
+          allow_any_instance_of(resource).to receive(:check2?) { pass }
+          resource.before_query :check2!, unless: :check2?
+          schema!
+        end
+
+        context "and the check passes" do
+          let(:pass) { true }
+
+          it "does not fire" do
+            run!
+            expect(resource.before_queries).to eq([:check1!])
+          end
+        end
+
+        context "and the check fails" do
+          let(:pass) { false }
+
+          it "works" do
+            run!
+            expect(resource.before_queries).to eq([:check1!, :check2!])
+          end
+        end
+      end
+
+      context "when multiple" do
+        before do
+          resource.before_query :check2!
+          resource.before_query :check3!
+        end
+
+        it "fires each in order" do
+          run!
+          expect(resource.before_queries)
+            .to eq([:check1!, :check2!, :check3!])
+        end
+      end
+    end
+
     describe "Resource#selections" do
       def apply(resource, attr = :selections)
         $spy = OpenStruct.new

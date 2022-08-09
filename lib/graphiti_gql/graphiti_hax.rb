@@ -16,7 +16,10 @@ module GraphitiGql
   module ResourceExtras
     extend ActiveSupport::Concern
 
-    included do
+    prepended do
+      extend ActiveModel::Callbacks
+      define_model_callbacks :query
+
       class << self
         attr_accessor :graphql_name, :singular
       end
@@ -57,7 +60,14 @@ module GraphitiGql
       @selections
     end
 
+    def around_scoping(original_scope, query_hash)
+      run_callbacks :query do
+        super { |scope| yield scope }
+      end
+    end
+
     class_methods do
+
       def attribute(*args)
         super(*args).tap do
           opts = args.extract_options!
@@ -85,7 +95,7 @@ module GraphitiGql
       end
     end
   end
-  Graphiti::Resource.send(:include, ResourceExtras)
+  Graphiti::Resource.send(:prepend, ResourceExtras)
 
   module FilterExtras
     def filter_param

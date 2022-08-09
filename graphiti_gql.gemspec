@@ -38,9 +38,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "graphql", "~> 2.0"
   spec.add_dependency "graphql-batch", "~> 0.5"
   spec.add_dependency "graphiti", "~> 1.3.9"
+  spec.add_dependency "activemodel", ["> 6.0", "< 8.0"]
 
   spec.add_development_dependency "bundler", "~> 2.3"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "rspec", "~> 3.0"
-  spec.add_development_dependency "activemodel", "~> 7.0"
 end

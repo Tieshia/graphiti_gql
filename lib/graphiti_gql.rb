@@ -1,6 +1,7 @@
 require "active_support/core_ext/object/json"
 require "graphql"
 require 'graphql/batch'
+require 'active_model'
 require "graphiti_gql/graphiti_hax"
 require "graphiti_gql/version"
 require "graphiti_gql/errors"
