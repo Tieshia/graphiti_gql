@@ -269,7 +269,7 @@ module GraphitiGql
   module ActiveRecordAdapterExtras
     extend ActiveSupport::Concern
 
-    included do
+    prepended do
       alias_method :filter_precise_datetime_lt, :filter_lt
       alias_method :filter_precise_datetime_lte, :filter_lte
       alias_method :filter_precise_datetime_gt, :filter_gt
@@ -277,16 +277,59 @@ module GraphitiGql
       alias_method :filter_precise_datetime_eq, :filter_eq
       alias_method :filter_precise_datetime_not_eq, :filter_not_eq
     end
+
+    # TODO: integration specs mysql vs postgres for case sensitivity
+    def mysql?(scope)
+      mysql = ActiveRecord::ConnectionAdapters::Mysql2Adapter
+      scope.model.connection.is_a?(mysql)
+    end
+
+    def filter_string_eq(scope, attribute, value, is_not: false)
+      if mysql?(scope)
+        clause = { attribute => value }
+        is_not ? scope.where.not(clause) : scope.where(clause)
+      else
+        # og behavior
+        column = column_for(scope, attribute)
+        clause = column.lower.eq_any(value.map(&:downcase))
+      end
+    end
+
+    def filter_string_eql(scope, attribute, value, is_not: false)
+      if mysql?(scope)
+        value = "BINARY #{value}"
+      end
+      # og behavior
+      clause = {attribute => value}
+      is_not ? scope.where.not(clause) : scope.where(clause)
+    end
+ 
+    def sanitized_like_for(scope, attribute, value, &block)
+      escape_char = "\\"
+      column = column_for(scope, attribute)
+      map = value.map { |v|
+        v = v.downcase unless mysql?(scope)
+        v = Sanitizer.sanitize_like(v, escape_char)
+        block.call v
+      }
+      arel = column
+      arel = arel.lower unless mysql?(scope)
+      arel.matches_any(map, escape_char, true)
+    end
   end
   if defined?(Graphiti::Adapters::ActiveRecord)
-    Graphiti::Adapters::ActiveRecord.send(:include, ActiveRecordAdapterExtras)
+    Graphiti::Adapters::ActiveRecord.send(:prepend, ActiveRecordAdapterExtras)
   end
 
   Graphiti::Adapters::Abstract.class_eval do
     class << self
       alias :old_default_operators :default_operators
       def default_operators
-        old_default_operators.merge(precise_datetime: numerical_operators)
+        old_default_operators.merge({
+          precise_datetime: numerical_operators,
+          string_enum: [:eq, :not_eq],
+          integer_enum: [:eq, :not_eq],
+        })
       end
     end
   end

@@ -74,6 +74,7 @@ module GraphitiGql
 
       def node(id = nil)
         if @resource.singular
+          data # fire query
           Node.new(underscore(data[data.keys.first]), @resource)
         else
           nodes.find { |n| n.id == id.to_s }
