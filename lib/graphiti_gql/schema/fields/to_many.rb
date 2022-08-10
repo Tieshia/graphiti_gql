@@ -35,7 +35,7 @@ module GraphitiGql
         end
 
         def customized_edge?
-          @sideload.type == :many_to_many && @sideload.class.edge_resource
+          @sideload.type == :many_to_many && @sideload.edge_resource
         end
 
         def find_or_build_connection
@@ -59,21 +59,60 @@ module GraphitiGql
         end
 
         def build_edge_type_class(sideload_type)
-          prior_edge_type_class = sideload_type.edge_type_class
-          edge_type_class = Class.new(prior_edge_type_class)
-          edge_resource = @sideload.class.edge_resource
-          edge_resource.attributes.each_pair do |name, config|
-            next if name == :id
-            Schema::Fields::Attribute.new(edge_resource, name, config, @sideload).apply(edge_type_class)
+          klass = build_friendly_graphql_edge_type_class \
+            sideload_type.edge_type_class
+          name = edge_type_class_name(sideload_type)
+          klass.define_method(:graphql_name) { name }
+          klass.graphql_name(name)
+          edge_resource = @sideload.edge_resource
+          ResourceType.add_fields(klass, edge_resource, id: false)
+          ResourceType.add_relationships(edge_resource, klass)
+          klass
+        end
+
+        # Normally we reference 'object', but edges work differently
+        # This makes 'object' work everywhere
+        # Needed when evaluating fields/relationships for consistent interface
+        def build_friendly_graphql_edge_type_class(superklass)
+          klass = Class.new(superklass) do
+            alias :original_object :object
+            def object
+              return @_object if @_object # avoid conflict
+
+              node = original_object.node # the 'parent' record we joined with
+              edge_attrs = node.attributes.select { |k,v| k.to_s.starts_with?('_edge') }
+              edge_attrs.transform_keys! { |k| k.to_s.gsub('_edge_', '') }
+              edge_model = model.new(edge_attrs)
+              edge_model.instance_variable_set(:@__graphiti_resource, resource)
+              @_object = edge_model
+              @_object
+            end
+
+            def cursor
+              original_object.cursor
+            end
+
+            def node
+              original_object.node
+            end
           end
-          registered_parent = Schema.registry.get(@sideload.parent_resource.class)
+
+          # used in #object
+          thru = @sideload.foreign_key.keys.first
+          reflection = @sideload.parent_resource.model.reflect_on_association(thru)
+          thru_model = reflection.klass
+          edge_resource = @sideload.edge_resource.new
+          klass.define_method(:model) { thru_model }
+          klass.define_method(:resource) { edge_resource }
+
+          klass
+        end
+
+        def edge_type_class_name(sideload_type)
+          registered_parent = Schema.registry.get \
+            @sideload.parent_resource.class
           parent_name = registered_parent[:type].graphql_name
-          edge_type_class_name = "#{parent_name}To#{sideload_type.graphql_name}Edge"
-          edge_type_class.define_method :graphql_name do
-            edge_type_class_name
-          end
-          edge_type_class.graphql_name(edge_type_class_name)
-          edge_type_class
+          "#{parent_name}To#{sideload_type.graphql_name}Edge"
         end
       end
     end

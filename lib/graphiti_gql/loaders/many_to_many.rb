@@ -16,13 +16,15 @@ module GraphitiGql
 
       private
 
+      def thru_model
+        thru = @sideload.foreign_key.keys.first
+        reflection = @sideload.parent_resource.model.reflect_on_association(thru)
+        reflection.klass
+      end
+
       def add_join_table_magic(proxy)
         return unless @sideload.edge_magic
         if defined?(ActiveRecord) && proxy.resource.model.ancestors.include?(ActiveRecord::Base)
-          thru = @sideload.foreign_key.keys.first
-          reflection = @sideload.parent_resource.model.reflect_on_association(thru)
-          thru_model = reflection.klass
-
           thru_table_name = @sideload.join_table_alias || thru_model.table_name
           names = thru_model.column_names.map do |n|
             next if n == :id

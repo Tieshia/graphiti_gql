@@ -30,30 +30,9 @@ module GraphitiGql
       end
 
       def add_relationships
-        each_relationship do |type, sideload_type, sideload|
-          if [:has_many, :many_to_many, :has_one].include?(sideload.type)
-            Fields::ToMany.new(sideload, sideload_type).apply(type)
-          else
-            Fields::ToOne.new(sideload, sideload_type).apply(type)
-          end
-        end
-      end
-
-      def each_relationship
         registry.resource_types.each do |registered|
-          registered[:resource].sideloads.each do |name, sl|
-            next unless sl.readable?
-
-            registered_sl = if sl.type == :polymorphic_belongs_to
-              PolymorphicBelongsToInterface
-                .new(registered[:resource], sl)
-                .build
-            else
-              registry.get(sl.resource.class)
-            end
-
-            yield registered[:type], registered_sl[:type], sl
-          end
+          resource, type = registered[:resource], registered[:type]
+          ResourceType.add_relationships(resource, type)
         end
       end
     end

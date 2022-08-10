@@ -3447,6 +3447,13 @@ RSpec.describe GraphitiGql do
             PORO::Team.create(name: "Agatha's Team")
           end
 
+          before do
+            allow(PORO::Employee)
+              .to receive(:reflect_on_association)
+              .with(:employee_teams)
+              .and_return(double(klass: PORO::EmployeeTeam))
+          end
+
           it "works" do
             json = run(%(
               query {
@@ -3606,17 +3613,27 @@ RSpec.describe GraphitiGql do
             end
 
             def setup!
-              opts = { foreign_key: { employee_teams: :employee_id } }
-              resource.many_to_many(:teams, opts, &blk)
+              opts = {
+                foreign_key: {
+                  employee_teams: :employee_id
+                },
+                edge_resource: edge_resource
+              }
+              resource.many_to_many(:teams, opts)
               schema!
+            end
+
+            let(:edge_resource) do
+              Class.new(PORO::ApplicationResource) do
+                def self.name;'EmployeeTeamResource';end
+              end
             end
 
             context "when the attribute is not customized" do
               let(:field) { "primary" }
-              let(:blk) do
-                lambda do |*args|
-                  attribute :primary, :boolean
-                end
+
+              before do
+                edge_resource.attribute :primary, :boolean
               end
 
               it "works" do
@@ -3626,10 +3643,9 @@ RSpec.describe GraphitiGql do
 
               context "but alias is passed" do
                 let(:field) { "isPrimary" }
-                let(:blk) do
-                  lambda do |*args|
-                    attribute :is_primary, :boolean, alias: :primary
-                  end
+
+                before do
+                  edge_resource.attribute :is_primary, :boolean, alias: :primary
                 end
 
                 it "is honored" do
@@ -3640,11 +3656,9 @@ RSpec.describe GraphitiGql do
             end
 
             context "when the attribute is customized" do
-              let(:blk) do
-                lambda do |*args|
-                  attribute :is_primary, :boolean do |edge|
-                    edge[:primary]
-                  end
+              before do
+                edge_resource.attribute :is_primary, :boolean do
+                  object.primary
                 end
               end
 
@@ -3656,17 +3670,11 @@ RSpec.describe GraphitiGql do
 
             # TODO docs - :admin? gets called on child resource
             context "when guarded" do
-              let(:blk) do
-                lambda do |*args|
-                  attribute :is_primary, :boolean, readable: :admin? do |edge|
-                    edge[:primary]
-                  end
-                end
-              end
-
               before do
-                allow_any_instance_of(PORO::TeamResource)
-                  .to receive(:admin?) { is_admin }
+                edge_resource.attribute :is_primary, :boolean, readable: :admin? do
+                  object.primary
+                end
+                allow_any_instance_of(edge_resource).to receive(:admin?) { is_admin }
               end
 
               context "and the guard passes" do

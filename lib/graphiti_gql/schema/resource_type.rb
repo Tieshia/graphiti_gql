@@ -14,6 +14,36 @@ module GraphitiGql
         end
       end
 
+      def self.add_fields(type, resource, id: true)
+        resource.attributes.each_pair do |name, config|
+          next if name == :id && id == false
+          if config[:readable]
+            Fields::Attribute.new(resource, name, config).apply(type)
+          end
+        end
+      end
+
+      def self.add_relationships(resource, type)
+        resource.sideloads.each do |name, sideload|
+          next unless sideload.readable?
+
+          registered_sl = if sideload.type == :polymorphic_belongs_to
+            PolymorphicBelongsToInterface
+              .new(resource, sideload)
+              .build
+          else
+            Schema.registry.get(sideload.resource.class)
+          end
+          sideload_type = registered_sl[:type]
+
+          if [:has_many, :many_to_many, :has_one].include?(sideload.type)
+            Fields::ToMany.new(sideload, sideload_type).apply(type)
+          else
+            Fields::ToOne.new(sideload, sideload_type).apply(type)
+          end
+        end
+      end
+
       def initialize(resource, implements: nil)
         @resource = resource
         @implements = implements
@@ -86,14 +116,10 @@ module GraphitiGql
       def name
         registry.key_for(@resource)
       end
-  
+
       def add_fields(type, resource)
-        resource.attributes.each_pair do |name, config|
-          if config[:readable]
-            Fields::Attribute.new(@resource, name, config).apply(type)
-          end
-        end
-      end
+        self.class.add_fields(type, resource)
+      end 
 
       def build_connection_class
         klass = Class.new(GraphQL::Types::Relay::BaseConnection)

@@ -196,26 +196,14 @@ module GraphitiGql
   module ManyToManyExtras
     def self.prepended(klass)
       klass.class_eval do
-        attr_reader :join_table_alias, :edge_magic
-
-        class << self
-          attr_reader :edge_resource
-
-          def attribute(*args, &blk)
-            @edge_resource ||= Class.new(Graphiti::Resource) do
-              def self.abstract_class?
-                true
-              end
-            end
-            @edge_resource.attribute(*args, &blk)
-          end
-        end
+        attr_reader :join_table_alias, :edge_magic, :edge_resource
       end
     end
     
     def initialize(name, opts = {})
       @join_table_alias = opts[:join_table_alias]
       @edge_magic = opts[:edge_magic] == false ? false : true
+      @edge_resource = opts[:edge_resource]
       super
     end
 
