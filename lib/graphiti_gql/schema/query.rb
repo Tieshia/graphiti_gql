@@ -10,6 +10,7 @@ module GraphitiGql
       def build
         @resources.each { |resource| ResourceType.new(resource).build }
         define_entrypoints
+        add_value_objects
         add_relationships
         @query_class
       end
@@ -33,6 +34,13 @@ module GraphitiGql
         registry.resource_types.each do |registered|
           resource, type = registered[:resource], registered[:type]
           ResourceType.add_relationships(resource, type)
+        end
+      end
+
+      def add_value_objects
+        registry.resource_types.each do |registered|
+          resource, type = registered[:resource], registered[:type]
+          ResourceType.add_value_objects(resource, type)
         end
       end
     end

@@ -221,6 +221,13 @@ module PORO
       @positions ||= []
       @teams ||= []
     end
+
+    def working_hours
+      {
+        from: "default from #{id}",
+        to: "default to #{id}"
+      }
+    end
   end
 
   class Position < Base
@@ -490,6 +497,13 @@ module PORO
     end
   end
 
+  class WorkingHourResource < ApplicationResource
+    value_object!
+
+    attribute :from, :string
+    attribute :to, :string
+  end
+
   class EmployeeResource < ApplicationResource
     self.serializer = PORO::EmployeeSerializer
     attribute :created_at, :datetime do
@@ -518,6 +532,7 @@ module PORO
     has_many :credit_cards
     many_to_many :teams, foreign_key: {employee_teams: :employee_id}
     polymorphic_has_many :notes, as: :notable
+    value_object :working_hours
 
     attribute :guarded_first_name, :string, filterable: :admin?, sortable: :admin? do
       object.first_name

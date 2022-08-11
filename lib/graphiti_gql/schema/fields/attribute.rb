@@ -30,7 +30,11 @@ module GraphitiGql
             value = if _config[:proc]
               instance_eval(&_config[:proc])
             else
-              object.send(_alias || _name)
+              if object.is_a?(Hash)
+                object[_name] || object[_name.to_s]
+              else
+                object.send(_alias || _name)
+              end
             end
             return if value.nil?
             Graphiti::Types[_config[:type]][:read].call(value)

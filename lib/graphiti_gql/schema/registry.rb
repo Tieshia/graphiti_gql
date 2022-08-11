@@ -52,7 +52,8 @@ module GraphitiGql
       # When polymorphic parent, returns the Interface not the Class
       def resource_types
         values
-          .select { |v| v.key?(:resource) && !v[:interface] }
+          .select { |v| v.key?(:resource) }
+          .reject { |v| v[:interface] || v[:resource].value_object? }
           .map { |registered| get(registered[:resource]) }
       end
 

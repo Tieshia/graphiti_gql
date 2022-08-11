@@ -14,11 +14,44 @@ module GraphitiGql
         end
       end
 
-      def self.add_fields(type, resource, id: true)
+      def self.add_fields(type, resource, id: true) # id: false for edges
         resource.attributes.each_pair do |name, config|
           next if name == :id && id == false
           if config[:readable]
             Fields::Attribute.new(resource, name, config).apply(type)
+          end
+        end
+      end
+
+      def self.add_value_objects(resource, type)
+        resource.config[:value_objects].each_pair do |name, vo_association|
+          vo_resource_class = vo_association.resource_class
+          value_object_type = Schema.registry.get(vo_resource_class)[:type]
+          if vo_association.array?
+            value_object_type = [value_object_type]
+          end
+
+          _array = vo_association.array?
+          opts = { null: vo_association.null }
+          opts[:deprecation_reason] = vo_association.deprecation_reason if vo_association.deprecation_reason
+          type.field name, value_object_type, **opts
+          type.define_method name do
+            if (method_name = vo_association.readable)
+              unless vo_association.parent_resource_class.new.send(method_name)
+                raise ::Graphiti::Errors::UnreadableAttribute
+                  .new(vo_association.parent_resource_class, name)
+              end
+            end
+
+            result = vo_resource_class.all({ parent: object }).to_a
+            if result.is_a?(Array) && !_array
+              result = result.first
+            end
+            if result == object || result == [object]
+              method_name = vo_association.alias.presence || name
+              result = object.send(method_name)
+            end
+            result
           end
         end
       end

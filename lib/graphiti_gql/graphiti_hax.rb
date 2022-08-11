@@ -25,6 +25,10 @@ module GraphitiGql
       end
     end
 
+    def value_object?
+      self.class.value_object?
+    end
+
     def filterings
       @filterings ||= begin
         if @params.key?(:filter)
@@ -67,6 +71,11 @@ module GraphitiGql
     end
 
     class_methods do
+      def config
+        return @config if @config
+        super
+        @config = @config.merge(value_objects: {}, is_value_object: false)
+      end
 
       def attribute(*args)
         super(*args).tap do
@@ -92,6 +101,40 @@ module GraphitiGql
         else
           super
         end
+      end
+
+      def value_object?
+        !!config[:is_value_object]
+      end
+
+      def value_object!
+        config[:is_value_object] = true
+        self.adapter = ::Graphiti::Adapters::Null
+        config[:filters] = {}
+        config[:stats] = {}
+        config[:sorts] = {}
+        config[:attributes].delete(:id)
+        define_method :base_scope do
+          {}
+        end
+        define_method :resolve do |parent|
+          [parent]
+        end
+      end
+
+      def value_object(name, opts = {})
+        opts[:array] ||= false
+        opts[:null] ||= true
+        config[:value_objects][name] = Graphiti::ValueObjectAssociation.new(
+          name,
+          parent_resource_class: self,
+          resource_class: opts[:resource],
+          _alias: opts[:alias],
+          is_array: opts[:array],
+          null: opts[:null],
+          readable: opts[:readable],
+          deprecation_reason: opts[:deprecation_reason]
+        )
       end
     end
   end
@@ -264,6 +307,20 @@ module GraphitiGql
     description: 'Datetime with milliseconds'
   }
 
+  [:string, :integer, :float, :datetime, :precise_datetime].each do |kind|
+    duped_hash = Graphiti::Util::Hash.deep_dup(Graphiti::Types[:hash])
+    type = Graphiti::Types[:"#{kind}_range"] = duped_hash
+    type[:canonical_name] = :"#{kind}_range"
+    Graphiti::Types[:"array_of_#{kind}_ranges"] = {
+      canonical_name: :"#{kind}_range",
+      params: Dry::Types["strict.array"].of(type[:params]),
+      read: Dry::Types["strict.array"].of(type[:read]),
+      write: Dry::Types["strict.array"].of(type[:write]),
+      kind: "array",
+      description: "Base Type."
+    }
+  end
+
   module ActiveRecordAdapterExtras
     extend ActiveSupport::Concern
 
@@ -363,6 +420,15 @@ module GraphitiGql
   
   Graphiti::Query.send(:prepend, QueryExtras)
   module ScopeExtras
+    def initialize(object, resource, query, opts = {})
+      if resource.value_object?
+        object = query.params[:parent]
+        super(object, resource, query, opts)
+      else
+        super
+      end
+    end
+
     def resolve(*args)
       results = super
       results.reverse! if @query.hash[:reverse]
@@ -382,5 +448,49 @@ module GraphitiGql
   if defined?(ActiveRecord)
     ::Graphiti::Adapters::ActiveRecord::ManyToManySideload
       .send(:prepend, ActiveRecordManyToManyExtras)
+  end
+end
+
+class Graphiti::ValueObjectAssociation
+  attr_reader :name,
+    :parent_resource_class,
+    :alias,
+    :readable,
+    :null,
+    :deprecation_reason
+
+  def initialize(
+    name,
+    parent_resource_class:,
+    resource_class:,
+    is_array: false,
+    readable: nil,
+    null: true,
+    _alias: nil,
+    deprecation_reason: nil
+  )
+    @name = name
+    @parent_resource_class = parent_resource_class
+    @resource_class = resource_class
+    @readable = readable
+    @array = is_array
+    @alias = _alias
+    @null = null
+    @deprecation_reason = deprecation_reason
+  end
+
+  def array?
+    !!@array
+  end
+
+  def resource_class
+    @resource_class ||= Graphiti::Util::Class
+      .infer_resource_class(@parent_resource_class, name)
+  end
+
+  def build_resource(parent)
+    instance = resource_class.new
+    instance.parent = parent
+    instance
   end
 end

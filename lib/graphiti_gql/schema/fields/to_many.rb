@@ -67,6 +67,7 @@ module GraphitiGql
           edge_resource = @sideload.edge_resource
           ResourceType.add_fields(klass, edge_resource, id: false)
           ResourceType.add_relationships(edge_resource, klass)
+          ResourceType.add_value_objects(edge_resource, klass)
           klass
         end
 

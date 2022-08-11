@@ -86,6 +86,20 @@ RSpec.describe GraphitiGql do
           .to eq("Field 'employee' doesn't accept argument 'page'")
       end
 
+      it "cannot fetch value objects" do
+        json = run(%|
+          query {
+            workingHour {
+              nodes {
+                id
+              }
+            }
+          }
+        |)
+        expect(json[:errors][0][:message])
+          .to eq("Field 'workingHour' doesn't exist on type 'Query'")
+      end
+
       context "when fetching id" do
         context "and it is null" do
           before do
@@ -461,6 +475,20 @@ RSpec.describe GraphitiGql do
             })
           end
         end
+      end
+
+      it "cannot fetch value objects" do
+        json = run(%|
+          query {
+            workingHours {
+              nodes {
+                id
+              }
+            }
+          }
+        |)
+        expect(json[:errors][0][:message])
+          .to eq("Field 'workingHours' doesn't exist on type 'Query'")
       end
 
       context "when an attribute field has custom rendering" do
@@ -1901,6 +1929,298 @@ RSpec.describe GraphitiGql do
                 }
               ))
             end
+          end
+        end
+      end
+
+      context "when requesting value objects" do
+        let(:query) do
+          %|
+            query {
+              employees {
+                nodes {
+                  workingHours {
+                    to
+                    from
+                  }
+                }
+              }
+            }
+          |
+        end
+
+        it "works" do
+          json = run(query)
+          expect(json).to eq({
+            employees: {
+              nodes: [
+                {
+                  workingHours: {
+                    from: "default from 1",
+                    to: "default to 1"
+                  }
+                },
+                {
+                  workingHours: {
+                    from: "default from 2",
+                    to: "default to 2"
+                  }
+                },
+              ]
+            }
+          })
+        end
+
+        it "does not autogenerate id field" do
+          json = run(%|
+            query {
+              employees {
+                nodes {
+                  workingHours {
+                    id
+                  }
+                }
+              }
+            }
+          |)
+          expect(json[:errors][0][:message])
+            .to eq("Field 'id' doesn't exist on type 'POROWorkingHour'")
+        end
+
+        context "when explicit 'resolve'" do
+          before do
+            wh_resource = Class.new(PORO::WorkingHourResource) do
+              def self.name;'PORO::WorkingHourResource';end
+
+              def resolve(parent)
+                {
+                  from: "from #{parent.first_name}",
+                  to: "to #{parent.last_name}",
+                }
+              end
+            end
+            resource.value_object :working_hours, resource: wh_resource
+            schema!
+          end
+
+          it "is honored" do
+            json = run(query)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  {
+                    workingHours: {
+                      from: "from Stephen",
+                      to: "to King"
+                    }
+                  },
+                  {
+                    workingHours: {
+                      from: "from Agatha",
+                      to: "to Christie"
+                    }
+                  },
+                ]
+              }
+            })
+          end
+        end
+
+        context "when 'resource' passed" do
+          before do
+            wh_resource = Class.new(PORO::WorkingHourResource) do
+              def self.name;'PORO::WorkingHourResource';end
+
+              def resolve(parent)
+                {
+                  from: "resource:",
+                  to: "resource:"
+                }
+              end
+            end
+            resource.value_object :working_hours, resource: wh_resource
+            schema!
+          end
+
+          it "is honored" do
+            json = run(query)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  {
+                    workingHours: {
+                      from: "resource:",
+                      to: "resource:"
+                    }
+                  },
+                  {
+                    workingHours: {
+                      from: "resource:",
+                      to: "resource:"
+                    }
+                  },
+                ]
+              }
+            })
+          end
+        end
+
+        context "when 'null' not passed" do
+          before do
+            allow_any_instance_of(PORO::Employee)
+              .to receive(:working_hours) { nil }
+            resource.value_object :working_hours
+            schema!
+          end
+
+          it "can be nil" do
+            json = run(query)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  { workingHours: nil },
+                  { workingHours: nil }
+                ]
+              }
+            })
+          end
+        end
+
+        context "when 'null' passed" do
+          before do
+            allow_any_instance_of(PORO::Employee)
+              .to receive(:working_hours) { nil }
+            resource.value_object :working_hours, null: false
+            schema!
+          end
+
+          it "is honored" do
+            json = run(query)
+            expect(json[:errors][0][:message])
+              .to eq("Cannot return null for non-nullable field POROEmployee.workingHours")
+          end
+        end
+
+        context "when 'deprecation_reason' passed" do
+          before do
+            allow_any_instance_of(PORO::Employee)
+              .to receive(:working_hours) { nil }
+            resource.value_object :working_hours, deprecation_reason: "foo!"
+            schema!
+          end
+
+          it "is honored" do
+            employees = GraphitiGql.schema.query.fields["employees"]
+            node = employees.type.of_type.fields["nodes"].type.of_type
+            reason = node.fields["workingHours"].deprecation_reason
+            expect(reason).to eq('foo!')
+          end
+        end
+
+        context "when 'alias' passed" do
+          before do
+            allow_any_instance_of(PORO::Employee)
+              .to receive(:hours) { { from: 'foo', to: 'bar' } }
+            resource.value_object :working_hours, alias: :hours
+            schema!
+          end
+
+          it "works" do
+            json = run(query)
+            json = run(query)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  { workingHours: { from: 'foo', to: 'bar' } },
+                  { workingHours: { from: 'foo', to: 'bar' } }
+                ]
+              }
+            })
+          end
+        end
+
+        context "when readable: guarded" do
+          before do
+            resource.value_object :working_hours, readable: :admin?
+            schema!
+          end
+
+          context "and the guard passes" do
+            before do
+              allow_any_instance_of(resource).to receive(:admin?) { true }
+            end
+
+            it "works" do
+              expect { run(query) }.to_not raise_error
+            end
+          end
+
+          context "and the guard fails" do
+            before do
+              allow_any_instance_of(resource).to receive(:admin?) { false }
+            end
+
+            it "raises error" do
+              expect { run(query) }
+                .to raise_error(Graphiti::Errors::UnreadableAttribute)
+            end
+          end
+        end
+
+        context "when array: true" do
+          before do
+            allow_any_instance_of(PORO::Employee)
+              .to receive(:working_hours)
+              .and_return([{ from: 'a', to: 'b' }, { from: 'c', to: 'd' }])
+            resource.value_object :working_hours, array: true
+            schema!
+          end
+
+          it "works" do
+            json = run(query)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  {
+                    workingHours: [
+                      { from: "a", to: "b" },
+                      { from: "c", to: "d" },
+                    ],
+                  },
+                  {
+                    workingHours: [
+                      { from: "a", to: "b" },
+                      { from: "c", to: "d" },
+                    ]
+                  }
+                ]
+              }
+            })
+          end
+        end
+
+        context "when value object has a before_query" do
+          let(:wh_resource) do
+            Class.new(PORO::WorkingHourResource) do
+              class << self;attr_accessor :checked;end
+              def self.name;'PORO::WorkingHourResource';end
+
+              before_query :check!
+
+              def check!
+                self.class.checked = true
+              end
+            end
+          end
+
+          before do
+            resource.value_object :working_hours, resource: wh_resource
+            schema!
+          end
+
+          it 'still fires' do
+            run(query)
+            expect(wh_resource.checked).to eq(true)
           end
         end
       end
