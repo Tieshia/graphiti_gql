@@ -88,7 +88,14 @@ module GraphitiGql
       end
 
       def filter(name, *args, &blk)
+        is_bool = (filters[name] && filters[name][:type] == :boolean) ||
+          args[0] == :boolean
+        opts = args.length == 1 ? args[0] : args[1]
+        boolean_array = is_bool && opts[:single] == false
         super
+        # default behavior is to force single: true
+        filters[name][:single] = false if boolean_array
+       
         opts = args.extract_options!
         if opts[:if]
           attributes[name][:filterable] = opts[:if]

@@ -673,6 +673,45 @@ RSpec.describe GraphitiGql do
           end
         end
 
+        context "when filter is a boolean" do
+          it "does not support arrays by default" do
+            json = run(%|
+              query {
+                employees(filter: { active: { eq: [true, false] } }) {
+                  nodes {
+                    id
+                  }
+                }
+              }
+            |)
+            expect(json[:errors][0][:message])
+              .to eq("Argument 'eq' on InputObject 'POROEmployeeFilterFilteractive' has an invalid value ([true, false]). Expected type 'Boolean'.")
+          end
+
+          context "and single: false passed" do
+            before do
+              employee1.update_attributes(active: false)
+              employee2.update_attributes(active: true)
+              resource.filter :active, single: false
+              schema!
+            end
+
+            it "supports arrays" do
+              json = run(%|
+                query {
+                  employees(filter: { active: { eq: [true, false] } }) {
+                    nodes {
+                      id
+                    }
+                  }
+                }
+              |)
+              expect(json)  
+                .to eq(employees: { nodes: [{ id: "1" }, { id: "2" }] })
+            end
+          end
+        end
+
         context "when not filterable" do
           before do
             resource.attribute :first_name, :string, filterable: false

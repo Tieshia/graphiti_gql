@@ -36,7 +36,7 @@ module GraphitiGql
       integer: Integer,
       big_integer: GraphQL::Types::BigInt,
       float: Float,
-      boolean: GraphQL::Schema::Member::GraphQLTypeNames::Boolean,
+      boolean: GraphQL::Types::Boolean,
       date: GraphQL::Types::ISO8601Date,
       datetime: GraphQL::Types::ISO8601DateTime,
       precise_datetime: PreciseDatetime,
