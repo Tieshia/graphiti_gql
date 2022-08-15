@@ -689,25 +689,56 @@ RSpec.describe GraphitiGql do
           end
 
           context "and single: false passed" do
-            before do
-              employee1.update_attributes(active: false)
-              employee2.update_attributes(active: true)
-              resource.filter :active, single: false
-              schema!
-            end
+            context "when overriding .attribute" do
+              before do
+                employee1.update_attributes(active: false)
+                employee2.update_attributes(active: true)
+                resource.filter :active, single: false
+                schema!
+              end
 
-            it "supports arrays" do
-              json = run(%|
-                query {
-                  employees(filter: { active: { eq: [true, false] } }) {
-                    nodes {
-                      id
+              it "supports arrays" do
+                json = run(%|
+                  query {
+                    employees(filter: { active: { eq: [true, false] } }) {
+                      nodes {
+                        id
+                      }
                     }
                   }
-                }
-              |)
-              expect(json)  
-                .to eq(employees: { nodes: [{ id: "1" }, { id: "2" }] })
+                |)
+                expect(json)  
+                  .to eq(employees: { nodes: [{ id: "1" }, { id: "2" }] })
+              end
+            end
+
+            context "when one-off filter" do
+              before do
+                employee1.update_attributes(active: false)
+                employee2.update_attributes(active: true)
+                resource.filter :activity, :boolean, single: false do
+                  eq do |scope, value|
+                    scope[:conditions] ||= {}
+                    scope[:conditions][:active] = value
+                    scope
+                  end
+                end
+                schema!
+              end
+
+              it "supports arrays" do
+                json = run(%|
+                  query {
+                    employees(filter: { activity: { eq: [true, false] } }) {
+                      nodes {
+                        id
+                      }
+                    }
+                  }
+                |)
+                expect(json)  
+                  .to eq(employees: { nodes: [{ id: "1" }, { id: "2" }] })
+              end
             end
           end
         end
@@ -2026,16 +2057,35 @@ RSpec.describe GraphitiGql do
             .to eq("Field 'id' doesn't exist on type 'POROWorkingHour'")
         end
 
+        context "when array: true" do
+          before do
+            resource.value_object :working_hours, array: true
+            schema!
+          end
+
+          context "but fallback method returns a non-array" do
+            before do
+              allow_any_instance_of(PORO::Employee)
+                .to receive(:working_hours) { {} }
+            end
+
+            it "raises error" do
+              expect { run(query) }
+                .to raise_error(Graphiti::Errors::InvalidValueObject, /value object 'working_hours' configured with array: true but returned non-array: {}/)
+            end
+          end
+        end
+
         context "when explicit 'resolve'" do
           before do
             wh_resource = Class.new(PORO::WorkingHourResource) do
               def self.name;'PORO::WorkingHourResource';end
 
               def resolve(parent)
-                {
+                [{
                   from: "from #{parent.first_name}",
                   to: "to #{parent.last_name}",
-                }
+                }]
               end
             end
             resource.value_object :working_hours, resource: wh_resource
@@ -2063,6 +2113,22 @@ RSpec.describe GraphitiGql do
               }
             })
           end
+
+          context "that returns non-array" do
+            before do
+              resource.class_eval do
+                def resolve(scope)
+                  {}
+                end
+              end
+              schema!
+            end
+
+            it "raises error" do
+              expect { run(query) }
+                .to raise_error(Graphiti::Errors::InvalidResolve)
+            end
+          end
         end
 
         context "when 'resource' passed" do
@@ -2071,10 +2137,10 @@ RSpec.describe GraphitiGql do
               def self.name;'PORO::WorkingHourResource';end
 
               def resolve(parent)
-                {
+                [{
                   from: "resource:",
                   to: "resource:"
-                }
+                }]
               end
             end
             resource.value_object :working_hours, resource: wh_resource
@@ -2112,31 +2178,44 @@ RSpec.describe GraphitiGql do
             schema!
           end
 
-          it "can be nil" do
-            json = run(query)
-            expect(json).to eq({
-              employees: {
-                nodes: [
-                  { workingHours: nil },
-                  { workingHours: nil }
-                ]
-              }
-            })
+          context "and array: false" do
+            it "can be nil" do
+              json = run(query)
+              expect(json).to eq({
+                employees: {
+                  nodes: [
+                    { workingHours: nil },
+                    { workingHours: nil }
+                  ]
+                }
+              })
+            end
           end
         end
 
         context "when 'null' passed" do
-          before do
-            allow_any_instance_of(PORO::Employee)
-              .to receive(:working_hours) { nil }
-            resource.value_object :working_hours, null: false
-            schema!
+          context "and value object is array" do
+            before do
+              allow_any_instance_of(PORO::Employee)
+                .to receive(:working_hours) { nil }
+              resource.value_object :working_hours, null: false
+              schema!
+            end
           end
 
-          it "is honored" do
-            json = run(query)
-            expect(json[:errors][0][:message])
-              .to eq("Cannot return null for non-nullable field POROEmployee.workingHours")
+          context "and value object is not an array" do
+            before do
+              allow_any_instance_of(PORO::Employee)
+                .to receive(:working_hours) { nil }
+              resource.value_object :working_hours, null: false
+              schema!
+            end
+
+            it "is honored" do
+              json = run(query)
+              expect(json[:errors][0][:message])
+                .to eq("Cannot return null for non-nullable field POROEmployee.workingHours")
+            end
           end
         end
 

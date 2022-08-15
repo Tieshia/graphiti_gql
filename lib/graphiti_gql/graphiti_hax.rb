@@ -131,7 +131,7 @@ module GraphitiGql
 
       def value_object(name, opts = {})
         opts[:array] ||= false
-        opts[:null] ||= true
+        opts[:null] = true if opts[:null] != false
         config[:value_objects][name] = Graphiti::ValueObjectAssociation.new(
           name,
           parent_resource_class: self,
@@ -438,6 +438,7 @@ module GraphitiGql
 
     def resolve(*args)
       results = super
+      raise Graphiti::Errors::InvalidResolve unless results.is_a?(Array)
       results.reverse! if @query.hash[:reverse]
       results
     end
@@ -455,6 +456,24 @@ module GraphitiGql
   if defined?(ActiveRecord)
     ::Graphiti::Adapters::ActiveRecord::ManyToManySideload
       .send(:prepend, ActiveRecordManyToManyExtras)
+  end
+end
+
+class Graphiti::Errors::InvalidResolve < Graphiti::Errors::Base
+  def message
+    "Resource#resolve must always return an array"
+  end
+end
+
+class Graphiti::Errors::InvalidValueObject < Graphiti::Errors::Base
+  def initialize(resource, name, value)
+    @resource = resource
+    @name = name
+    @value = value
+  end
+
+  def message
+    "#{@resource} - value object '#{@name}' configured with array: true but returned non-array: #{@value.inspect}"
   end
 end
 

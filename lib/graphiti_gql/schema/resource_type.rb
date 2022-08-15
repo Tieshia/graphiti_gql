@@ -44,12 +44,14 @@ module GraphitiGql
             end
 
             result = vo_resource_class.all({ parent: object }).to_a
-            if result.is_a?(Array) && !_array
-              result = result.first
-            end
-            if result == object || result == [object]
+            default_behavior = result == [object]
+            result = result.first if !_array
+            if default_behavior
               method_name = vo_association.alias.presence || name
               result = object.send(method_name)
+              if _array && !result.is_a?(Array)
+                raise Graphiti::Errors::InvalidValueObject.new(resource, name, result)
+              end
             end
             result
           end
