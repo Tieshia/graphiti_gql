@@ -49,11 +49,13 @@ RSpec.configure do |config|
   end
 
   config.before do
+    GraphitiGql.config.error_handling = false
     schema!
   end
 
   config.after do
     PORO::DB.clear
+    GraphitiGql.instance_variable_set(:@config, nil)
 
     collected = []
     original_resources.each do |resource|

@@ -27,13 +27,22 @@ require "graphiti_gql/schema/fields/to_one"
 require "graphiti_gql/schema/fields/attribute"
 require "graphiti_gql/schema/fields/stats"
 require "graphiti_gql/active_resource"
+require "graphiti_gql/exception_handler"
 require "graphiti_gql/engine" if defined?(Rails)
 
 module GraphitiGql
   class Error < StandardError; end
 
   class Configuration
-    attr_accessor :application_controller
+    attr_accessor :exception_handler, :error_handling
+
+    def exception_handler
+      @exception_handler ||= ExceptionHandler
+    end
+
+    def error_handling
+      @error_handling != false
+    end
   end
 
   def self.schema!

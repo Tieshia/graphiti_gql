@@ -101,6 +101,14 @@ module GraphitiGql
       klass.connections.add(ResponseShim, Connection)
       klass.connections.add(Array, ToManyConnection)
       klass.orphan_types [GraphQL::Types::JSON]
+      klass.rescue_from(Exception) do |err, obj, args, ctx, field|
+        if GraphitiGql.config.error_handling
+          handler = GraphitiGql.config.exception_handler
+          handler.new(err, obj, args, ctx, field).handle
+        else
+          raise err
+        end
+      end
       klass
     end
   end

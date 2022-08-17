@@ -6085,5 +6085,157 @@ RSpec.describe GraphitiGql do
         end
       end
     end
+
+    describe "error handling" do
+      let(:query) do
+        %|
+          query {
+            employees {
+              nodes {
+                id
+              }
+            }
+          }
+        |
+      end
+
+      let(:handler) { Class.new(GraphitiGql::ExceptionHandler) }
+      let(:custom_error_class) do
+        Class.new(StandardError) do
+          def message
+            "message from custom error class"
+          end
+        end
+      end
+
+      before do
+        _err = custom_error_class
+        resource.define_method :resolve do |scope|
+          raise(_err)
+        end
+        GraphitiGql.config.exception_handler = handler
+        schema!
+      end
+
+      # TODO test vs dev
+      # TODO internal dev deets
+      context "when turned on" do
+        before do
+          GraphitiGql.config.error_handling = true
+        end
+
+        context "when any random error" do
+          it "is returned with generic payload" do
+            json = run(query)
+            expect(json).to eq({
+              data: nil,
+              errors: [{
+                message: "We're sorry, something went wrong.",
+                path: ["employees"],
+                extensions: { code: 500 },
+                locations: [{ column: 13, line: 3 }]
+              }]
+            })
+          end
+
+          it "notifies" do
+            expect_any_instance_of(handler).to receive(:notify)
+            run(query)
+          end
+
+          it "logs" do
+            expect_any_instance_of(handler).to receive(:log)
+            run(query)
+          end
+
+          context "and default message is customized" do
+            before do
+              handler.default_message = "foo!"
+            end
+
+            it "is honored" do
+              json = run(query)
+              expect(json[:errors][0][:message]).to eq('foo!')
+            end
+          end
+
+          context "and default code is customized" do
+            before do
+              handler.default_code = "code!"
+            end
+
+            it "is honored" do
+              json = run(query)
+              expect(json[:errors][0][:extensions][:code]).to eq('code!')
+            end
+          end
+
+          context 'when notify: false' do
+            before do
+              handler.register_exception(custom_error_class, notify: false)
+            end
+
+            it "does not notify" do
+              expect_any_instance_of(handler).to_not receive(:notify)
+              json = run(query)
+            end
+
+            it "does not apply to other errors" do
+              resource.define_method :resolve do |scope|
+                raise('foo')
+              end
+              expect_any_instance_of(handler).to receive(:notify)
+              json = run(query)
+            end
+          end
+
+          context 'when log: false' do
+            before do
+              handler.register_exception(custom_error_class, log: false)
+            end
+
+            it "does not log" do
+              expect_any_instance_of(handler).to_not receive(:log)
+              json = run(query)
+            end
+
+            it "does not apply to other errors" do
+              resource.define_method :resolve do |scope|
+                raise('foo')
+              end
+              expect_any_instance_of(handler).to receive(:log)
+              json = run(query)
+            end
+          end
+
+          context "when custom code" do
+            before do
+              handler.register_exception(custom_error_class, code: 403)
+            end
+
+            it "is respected" do
+              json = run(query)
+              expect(json[:errors][0][:extensions][:code]).to eq(403)
+            end
+
+            it "does not apply to other errors" do
+              resource.define_method :resolve do |scope|
+                raise('foo')
+              end
+            end
+          end
+        end
+      end
+
+      context "when turned off" do
+        before do
+          GraphitiGql.config.error_handling = false
+        end
+
+        it "raises error" do
+          expect { run(query) }.to raise_error(/message from custom error class/)
+        end
+      end
+    end
   end
 end
