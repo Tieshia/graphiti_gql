@@ -54,6 +54,8 @@ module GraphitiGql
           end
         end
         @resource.filters.each_pair do |name, config|
+          next if config[:schema] == false
+
           attr_type = generate_filter_attribute_type(type_name, name, config)
           required = !!config[:required] || required_via_group.include?(name)
           klass.argument name.to_s.camelize(:lower),

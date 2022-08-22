@@ -606,6 +606,65 @@ RSpec.describe GraphitiGql do
           end
         end
 
+        context "when schema: false" do
+          before do
+            position_resource.filter :employee_id, schema: false
+            schema!
+          end
+
+          it "does not appear in the schema" do
+            json = run(%|
+              query {
+                positions(filter: { employeeId: { eq: "123" } }) {
+                  nodes {
+                    id
+                  }
+                }
+              }
+            |)
+            expect(json[:errors][0][:message])
+              .to eq("InputObject 'POROPositionFilter' doesn't accept argument 'employeeId'")
+          end
+
+          it "can still be used as association" do
+            PORO::Position.create(employee_id: employee1.id)
+            PORO::Position.create(employee_id: employee2.id)
+            json = run(%|
+              query {
+                employees {
+                  nodes {
+                    positions {
+                      nodes {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            |)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  {
+                    positions: {
+                      nodes: [
+                        { id: "1" }
+                      ]
+                    }
+                  },
+                  {
+                    positions: {
+                      nodes: [
+                        { id: "2" }
+                      ]
+                    }
+                  }
+                ]
+              }
+            })
+          end
+        end
+
         context "when by id" do
           it "is a passed as a string" do
             json = run(%|
