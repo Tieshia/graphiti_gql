@@ -143,6 +143,12 @@ module GraphitiGql
           deprecation_reason: opts[:deprecation_reason]
         )
       end
+
+      def all(*args)
+        params = args[0]
+        Graphiti.broadcast("resource.all", { params: params, resource: self })
+        super
+      end
     end
   end
   Graphiti::Resource.send(:prepend, ResourceExtras)
@@ -518,5 +524,22 @@ class Graphiti::ValueObjectAssociation
     instance = resource_class.new
     instance.parent = parent
     instance
+  end
+end
+
+module Graphiti
+  def self.debug(msg, color = :white, bold = false)
+    log(msg, color, bold, level: :debug)
+  end
+
+  def self.info(msg, color = :white, bold = false)
+    log(msg, color, bold, level: :info)
+  end
+
+  def self.log(msg, color = :white, bold = false, level: nil)
+    return unless ::GraphitiGql.config.log
+    colored = ActiveSupport::LogSubscriber.new.send(:color, msg, color, bold)
+    level ||= :debug
+    logger.send(level, colored)
   end
 end

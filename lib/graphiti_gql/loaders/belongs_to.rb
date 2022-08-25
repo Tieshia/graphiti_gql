@@ -10,6 +10,7 @@ module GraphitiGql
       end
 
       def perform(ids)
+        Graphiti.broadcast("association", { sideload: @sideload })
         # process nils
         ids.each { |id| fulfill(id, nil) if id.nil? }
         ids.compact!

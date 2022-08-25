@@ -19,6 +19,7 @@ module GraphitiGql
       end
 
       def perform(parent_records)
+        Graphiti.broadcast("association", { sideload: @sideload })
         raise ::Graphiti::Errors::UnsupportedPagination if paginating? && parent_records.length > 1
         raise Errors::UnsupportedStats if requesting_stats? && parent_records.length > 1 && !can_group?
 

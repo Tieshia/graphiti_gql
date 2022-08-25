@@ -9,16 +9,19 @@ module GraphitiGql
         def apply(type)
           type.field :stats, build_stat_class, null: false
           type.define_method :stats do
+            Graphiti.broadcast('before_stats', {})
             # Process grouped (to-many relationship) stats
-            stats = object.proxy.stats.deep_dup
-            stats.each_pair do |attr, calc|
-              calc.each_pair do |calc_name, value|
-                if value.is_a?(Hash)
-                  stats[attr][calc_name] = value[parent.id]
+            Graphiti.broadcast('after_stats', {}) do
+              stats = object.proxy.stats.deep_dup
+              stats.each_pair do |attr, calc|
+                calc.each_pair do |calc_name, value|
+                  if value.is_a?(Hash)
+                    stats[attr][calc_name] = value[parent.id]
+                  end
                 end
               end
+              stats
             end
-            stats
           end
           type
         end

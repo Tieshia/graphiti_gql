@@ -28,13 +28,14 @@ require "graphiti_gql/schema/fields/attribute"
 require "graphiti_gql/schema/fields/stats"
 require "graphiti_gql/active_resource"
 require "graphiti_gql/exception_handler"
+require "graphiti_gql/log_subscriber"
 require "graphiti_gql/engine" if defined?(Rails)
 
 module GraphitiGql
   class Error < StandardError; end
 
   class Configuration
-    attr_accessor :exception_handler, :error_handling
+    attr_accessor :exception_handler, :error_handling, :logging
 
     def exception_handler
       @exception_handler ||= ExceptionHandler
@@ -42,6 +43,10 @@ module GraphitiGql
 
     def error_handling
       @error_handling != false
+    end
+
+    def log
+      @log ||= !ENV['GRAPHITI_LOG_LEVEL'].nil?
     end
   end
 
@@ -72,10 +77,20 @@ module GraphitiGql
       context = Graphiti.context[:object]
     end
     Graphiti.with_context(context) do
-      result = schema.execute query_string,
+      payload = {
+        query: query_string,
         variables: variables,
         context: context
-      result.to_h
+      }
+      Graphiti.broadcast("schema.before_execute", payload)
+      Graphiti.broadcast("schema.execute", payload) do
+        result = schema.execute query_string,
+          variables: variables,
+          context: context
+        result_hash = result.to_h
+        payload[:result] = result_hash
+        result_hash
+      end
     end
   end
 end

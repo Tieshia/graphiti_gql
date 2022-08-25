@@ -6296,5 +6296,36 @@ RSpec.describe GraphitiGql do
         end
       end
     end
+
+    describe "inspector" do
+      before do
+        PORO::Position.create(employee_id: employee1.id, title: 'adsf')
+        PORO::Position.create(employee_id: employee2.id, title: 'zzxfd')
+      end
+
+      let(:query) do
+        %|
+          query {
+            employees {
+              nodes {
+                id
+                firstName
+                lastName
+                positions {
+                  nodes {
+                    id
+                    title
+                  }
+                }
+              }
+            }
+          }
+        |
+      end
+
+      it "works" do
+        run(query)
+      end
+    end
   end
 end
