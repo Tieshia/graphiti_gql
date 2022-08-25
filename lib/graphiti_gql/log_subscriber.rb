@@ -35,7 +35,9 @@ module GraphitiGql
       num_results = payload[:results].length
       klasses = payload[:results].map(&:class).map(&:name).uniq
       color = num_results == 0 ? :yellow : :green
-      add_chunk("#{indent}   #{num_results} #{"result".pluralize(num_results)} of #{"type".pluralize(klasses.length)} #{klasses.to_sentence}", color, true)
+      stmt = "#{indent}   #{num_results} #{"result".pluralize(num_results)}"
+      stmt << " of #{"type".pluralize(klasses.length)} #{klasses.to_sentence}" if num_results > 0
+      add_chunk(stmt, color, true)
 
       took = ((stop - start) * 1000.0).round(2)
       add_chunk("#{indent}   Took: #{took}ms", :magenta, true)
@@ -75,7 +77,7 @@ end|, :white, true)
           Graphiti.info("❌🚨 Response contained errors!", :red, true)
           response_errors.each do |err|
             Graphiti.info("#{err['extensions']['code']} - #{err['message']}", :red, true)
-            Graphiti.info("#{err['path'].join(".")}", :red, false)
+            Graphiti.info("#{err['path'].join(".")}", :red, false) if err['path']
           end
         end
       else
@@ -153,6 +155,7 @@ end|, :white, true)
 
     def thin_path
       path = Graphiti.context[:object][:current_path]
+      return [] unless path
       path.reject do |p|
         p.is_a?(Integer) ||
           p == "nodes" ||
