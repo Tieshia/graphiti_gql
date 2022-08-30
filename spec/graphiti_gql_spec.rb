@@ -24,7 +24,7 @@ RSpec.describe GraphitiGql do
     let!(:employee2) do
       PORO::Employee.create(first_name: "Agatha", last_name: "Christie", age: 70)
     end
- 
+
     describe "fetching single entities" do
       it "works" do
         json = run(%|
@@ -402,7 +402,7 @@ RSpec.describe GraphitiGql do
           resource.graphql_entrypoint = :exemplary_employees
           schema!
         end
-  
+
         it "works" do
           json = run(%(
             query {
@@ -422,7 +422,7 @@ RSpec.describe GraphitiGql do
             }
           })
         end
-  
+
         it "does not expose the jsonapi type" do
           json = run(%(
             query {
@@ -444,7 +444,7 @@ RSpec.describe GraphitiGql do
             position_resource.graphql_entrypoint = :empPositions
             schema!
           end
-  
+
           it "is still queried via relationship name" do
             json = run(%(
               query {
@@ -716,7 +716,7 @@ RSpec.describe GraphitiGql do
               resource.filter :id, single: true
               schema!
             end
-  
+
             it "raises schema error" do
               json = run(%|
                 query {
@@ -768,7 +768,7 @@ RSpec.describe GraphitiGql do
                     }
                   }
                 |)
-                expect(json)  
+                expect(json)
                   .to eq(employees: { nodes: [{ id: gid("1") }, { id: gid("2") }] })
               end
             end
@@ -797,7 +797,7 @@ RSpec.describe GraphitiGql do
                     }
                   }
                 |)
-                expect(json)  
+                expect(json)
                   .to eq(employees: { nodes: [{ id: gid("1") }, { id: gid("2") }] })
               end
             end
@@ -809,7 +809,7 @@ RSpec.describe GraphitiGql do
             resource.attribute :first_name, :string, filterable: false
             schema!
           end
-  
+
           it "returns schema error" do
             json = run(%|
               query {
@@ -904,7 +904,7 @@ RSpec.describe GraphitiGql do
             resource.filter :first_name, only: [:prefix]
             schema!
           end
-  
+
           it "returns error" do
             json = run(%|
               query {
@@ -1010,7 +1010,7 @@ RSpec.describe GraphitiGql do
                     }
                   |, {})
                 end
-                expect(&do_run) 
+                expect(&do_run)
                   .to raise_error(Graphiti::Errors::InvalidAttributeAccess)
               end
             end
@@ -1022,7 +1022,7 @@ RSpec.describe GraphitiGql do
             resource.filter :first_name, allow: ["Agatha"]
             schema!
           end
-  
+
           it "works via enum" do
             json = run(%|
               query {
@@ -1063,7 +1063,7 @@ RSpec.describe GraphitiGql do
             resource.filter :first_name, deny: ["Stephen"]
             schema!
           end
-  
+
           context "and a good value is passed" do
             it "works" do
               json = run(%|
@@ -1111,7 +1111,7 @@ RSpec.describe GraphitiGql do
             end
             schema!
           end
-    
+
           context "and it is not passed" do
             it "raises schema error" do
               json = run(%(
@@ -1366,7 +1366,7 @@ RSpec.describe GraphitiGql do
           let!(:findme) do
             PORO::Employee.create(id: 999, first_name: "custom!")
           end
-  
+
           before do
             type = Dry::Types::Nominal
               .new(nil)
@@ -1390,11 +1390,11 @@ RSpec.describe GraphitiGql do
             end
             schema!
           end
-  
+
           after do
             Graphiti::Types.map.delete(:custom)
           end
-  
+
           it "works" do
             json = run(%(
               query {
@@ -1423,18 +1423,18 @@ RSpec.describe GraphitiGql do
                                   employee_id: employee1.id,
                                   active: true
           end
-  
+
           let!(:position2) do
             PORO::Position.create title: "Manager",
                                   employee_id: employee2.id
           end
-  
+
           let!(:active) do
             PORO::Position.create title: "Engineer",
                                   employee_id: employee2.id,
                                   active: true
           end
-  
+
           let!(:inactive) do
             PORO::Position.create title: "Old Manager",
                                   employee_id: employee2.id,
@@ -1514,6 +1514,54 @@ RSpec.describe GraphitiGql do
           end
         end
 
+        context "when attribute marked schema: false" do
+          before do
+            resource.sort :first_name, schema: false
+            schema!
+          end
+
+          it "does not appear in the schema" do
+            json = run(%|
+              query {
+                employees(sort: [{ att: firstName, dir: asc }]) {
+                  nodes {
+                    firstName
+                  }
+                }
+              }
+            |)
+            expect(json[:errors][0][:message])
+              .to eq("Argument 'att' on InputObject 'POROEmployeeSort' has an invalid value (firstName). Expected type 'POROEmployeeSortAtt!'.")
+          end
+        end
+
+        context "when attribute marked schema: true" do
+          before do
+            resource.sort :first_name, schema: true
+            schema!
+          end
+
+          it "works" do
+            json = run(%|
+              query {
+                employees(sort: [{ att: firstName, dir: asc }]) {
+                  nodes {
+                    firstName
+                  }
+                }
+              }
+            |)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  { firstName: "Agatha" },
+                  { firstName: "Stephen" }
+                ]
+              }
+            })
+          end
+        end
+
         context "when attribute sort is guarded" do
           context "and the guard fails" do
             it "raises error" do
@@ -1569,7 +1617,7 @@ RSpec.describe GraphitiGql do
           let!(:position3) do
             PORO::Position.create(title: "B", employee_id: employee1.id)
           end
-      
+
           it "works" do
             json = run(%|
               query {
@@ -2011,7 +2059,7 @@ RSpec.describe GraphitiGql do
               resource.stat multi_word_stat: [:sum]
               schema!
             end
-  
+
             it "works" do
               json = run(%(
                 query {
@@ -2853,7 +2901,7 @@ RSpec.describe GraphitiGql do
                 expect(positions[:stats][:total][:count]).to eq(2.0)
               end
             end
-          
+
             context "when no nodes requested" do
               it "sets page size 0" do
                 expect(PORO::PositionResource)
@@ -3548,7 +3596,7 @@ RSpec.describe GraphitiGql do
                 amount: 100,
                 credit_card_id: mastercard.id
             end
-    
+
             it "can be queried via toplevel (no fragment)" do
               json = run(%(
                 query {
@@ -3652,7 +3700,7 @@ RSpec.describe GraphitiGql do
                     amount: 200,
                     credit_card_id: visa.id
                 end
-    
+
                 it "works" do
                   expect_any_instance_of(PORO::TransactionResource)
                     .to receive(:resolve).and_call_original
@@ -3798,11 +3846,11 @@ RSpec.describe GraphitiGql do
                   let!(:transaction2) do
                     PORO::VisaRewardTransaction.create(amount: 200, reward_id: reward1.id)
                   end
-      
+
                   def transactions(json)
                     json[:creditCards][:nodes][1][:visaRewards][:nodes][0][:rewardTransactions][:nodes]
                   end
-      
+
                   it "works" do
                     expect_any_instance_of(PORO::VisaRewardResource)
                       .to receive(:resolve).and_call_original
@@ -3930,7 +3978,7 @@ RSpec.describe GraphitiGql do
                     let!(:nested_gold_visa) do
                       PORO::GoldVisa.create(number: "2", employee_id: employee2.id)
                     end
-      
+
                     it "still works" do
                       json = run(%(
                         query {
@@ -4001,11 +4049,11 @@ RSpec.describe GraphitiGql do
                   let!(:bad_mile) do
                     PORO::MastercardMile.create(mastercard_id: 999)
                   end
-      
+
                   let!(:mile) do
                     PORO::MastercardMile.create(mastercard_id: mastercard.id)
                   end
-      
+
                   it "works" do
                     json = run(%(
                       query {
@@ -4359,11 +4407,11 @@ RSpec.describe GraphitiGql do
               end
             end
           end
-    
+
           before do
             schema!
           end
-    
+
           it "works" do
             json = run(%(
               query {
@@ -4689,11 +4737,11 @@ RSpec.describe GraphitiGql do
                   employee_id: employee2.id,
                   active: false
               end
-    
+
               def positions(json)
                 json[:notes][:nodes][0][:notable][:positions][:nodes]
               end
-    
+
               it "can load" do
                 expect_any_instance_of(PORO::PositionResource)
                   .to receive(:resolve).and_call_original
@@ -4865,7 +4913,7 @@ RSpec.describe GraphitiGql do
                               notable_type: "PORO::Employee",
                               body: "foo"
           end
-        
+
           it "works" do
             json = run(%(
               query {
@@ -5011,7 +5059,7 @@ RSpec.describe GraphitiGql do
                               notable_type: "PORO::Employee",
                               notable_id: employee1.id
           end
-      
+
           it "works" do
             json = run(%(
               query {
@@ -5631,11 +5679,11 @@ RSpec.describe GraphitiGql do
         _out = definition.constructor do |input|
           input * 10
         end
-      
+
         _in = definition.constructor do |input|
           input.to_i / 10
         end
-      
+
         # Register it with Graphiti
         Graphiti::Types[:foo_type] = {
           params: _in,

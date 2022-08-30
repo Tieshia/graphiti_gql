@@ -128,10 +128,18 @@ module GraphitiGql
         super
         # default behavior is to force single: true
         filters[name][:single] = false if boolean_array
-       
+
         opts = args.extract_options!
         if opts[:if]
           attributes[name][:filterable] = opts[:if]
+        end
+      end
+
+      def sort(name, *args, &blk)
+        super
+        opts = args.extract_options!
+        if opts[:schema] == false
+          config[:sorts][name][:schema] = false
         end
       end
 
@@ -289,7 +297,7 @@ module GraphitiGql
         attr_reader :join_table_alias, :edge_magic, :edge_resource
       end
     end
-    
+
     def initialize(name, opts = {})
       @join_table_alias = opts[:join_table_alias]
       @edge_magic = opts[:edge_magic] == false ? false : true
@@ -431,7 +439,7 @@ module GraphitiGql
       clause = {attribute => value}
       is_not ? scope.where.not(clause) : scope.where(clause)
     end
- 
+
     def sanitized_like_for(scope, attribute, value, &block)
       escape_char = "\\"
       column = column_for(scope, attribute)
@@ -493,7 +501,7 @@ module GraphitiGql
       hash
     end
   end
-  
+
   Graphiti::Query.send(:prepend, QueryExtras)
   module ScopeExtras
     def initialize(object, resource, query, opts = {})

@@ -14,7 +14,7 @@ module GraphitiGql
 
       def apply(field)
         define_filters(field) unless @resource.filters.empty?
-        define_sorts(field) unless @resource.sorts.empty?
+        define_sorts(field) unless sorts.empty?
       end
 
       private
@@ -39,7 +39,7 @@ module GraphitiGql
         required = true if @resource.grouped_filters.any? && !@sideload
         field.argument :filter, filter_type, required: required
       end
-    
+
       def generate_filter_type(field)
         type_name = "#{registry.key_for(@resource)}Filter"
         if (registered = registry[type_name])
@@ -65,7 +65,7 @@ module GraphitiGql
         registry[type_name] = { type: klass }
         klass
       end
-    
+
       def generate_filter_attribute_type(type_name, filter_name, filter_config)
         klass = Class.new(GraphQL::Schema::InputObject)
         filter_graphql_name = "#{type_name}Filter#{filter_name.to_s.camelize(:lower)}"
@@ -82,13 +82,13 @@ module GraphitiGql
           if (allowlist = filter_config[:allow])
             type = define_allowlist_type(filter_graphql_name, allowlist)
           end
-  
+
           type = [type] unless !!filter_config[:single]
           klass.argument operator, type, required: false
         end
         klass
       end
-    
+
       def define_allowlist_type(filter_graphql_name, allowlist)
         name = "#{filter_graphql_name}Allow"
         if (registered = registry[name])
@@ -101,6 +101,12 @@ module GraphitiGql
         end
         registry[name] = { type: klass }
         klass
+      end
+
+      def sorts
+        @resource.sorts.reject do |key, value|
+          value[:schema] == false
+        end
       end
 
       def define_sorts(field)
@@ -116,13 +122,13 @@ module GraphitiGql
         klass = Class.new(GraphQL::Schema::Enum) {
           graphql_name(type_name)
         }
-        @resource.sorts.each_pair do |name, config|
+        sorts.each_pair do |name, config|
           klass.value name.to_s.camelize(:lower), "Sort by #{name}"
         end
         registry[type_name] = { type: klass }
         klass
       end
-  
+
       def generate_sort_type
         type_name = "#{registry.key_for(@resource)}Sort"
         if (registered = registry[type_name])
