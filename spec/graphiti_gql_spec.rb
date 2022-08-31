@@ -3385,6 +3385,45 @@ RSpec.describe GraphitiGql do
               })
             end
 
+            context "and only id requested" do
+              it "performs query because we can't know the type" do
+                expect(PORO::CreditCardResource)
+                  .to receive(:all).and_call_original
+                json = run(%(
+                  query {
+                    employees {
+                      nodes {
+                        firstName
+                        creditCards {
+                          nodes {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                ))
+                expect(json).to eq({
+                  employees: {
+                    nodes: [
+                      {
+                        firstName: "Stephen",
+                        creditCards: { nodes: [] }
+                      },
+                      {
+                        firstName: "Agatha",
+                        creditCards: {
+                          nodes: [
+                            { id: PORO::VisaResource.gid(visa.id) }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                })
+              end
+            end
+
             context "and fragmenting" do
               it "works" do
                 PORO::Mastercard.create(number: 77, employee_id: 2)

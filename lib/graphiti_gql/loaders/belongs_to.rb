@@ -20,7 +20,7 @@ module GraphitiGql
         ids.compact!
         return if ids.empty?
 
-        if @params[:simpleid]
+        if @params[:simpleid] && !to_polymorphic_resource?
           if @sideload.type == :polymorphic_belongs_to
             ids.each do |id|
               child = @sideload.children.values.find { |c| c.group_name == id[:type].to_sym }
@@ -55,8 +55,9 @@ module GraphitiGql
           end
           values = futures.map(&:value)
           ids.each do |id|
-            val = values.find { |v| v[:type] == id[:type] }
-            fulfill(id, val[:data][0])
+            records_for_type = values.find { |v| v[:type] == id[:type] }
+            corresponding = records_for_type[:data].find { |r| r.id == id[:id] }
+            fulfill(id, corresponding)
           end
         else
           resource = Schema.registry.get(@sideload.resource.class)[:resource]
@@ -73,6 +74,12 @@ module GraphitiGql
             ids.each { |id| fulfill(id, map[id]) }
           end
         end
+      end
+
+      private
+
+      def to_polymorphic_resource?
+        @sideload.resource.polymorphic? && @sideload.type != :polymorphic_belongs_to
       end
     end
   end
