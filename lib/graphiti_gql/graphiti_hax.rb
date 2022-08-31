@@ -71,13 +71,46 @@ module GraphitiGql
     end
 
     class_methods do
+      def gid(*ids)
+        ids = ids[0] if ids[0].is_a?(Array) && ids.length == 1
+        gids = ids.map { |id| serialize_gid(id) }
+        ids.length == 1 ? gids.first : gids
+      end
+
+      def serialize_gid(id)
+        Base64.encode64("#{graphql_name}/#{id}")
+      end
+
+      def deserialize_gid(gid, integer = true)
+        id = Base64.decode64(gid).split("/").last
+        id.to_i.to_s == id ? id.to_i : id
+      end
+
       def config
         return @config if @config
         super
         @config = @config.merge(value_objects: {}, is_value_object: false)
       end
 
+      def graphql_name
+        @graphql_name ||= begin
+          if name.nil?
+            'Unknown'
+          else
+            name.gsub('Resource', '').gsub('::', '')
+          end
+        end
+      end
+
       def attribute(*args)
+        # new default is :gid, not integer_id
+        if args[0] == :id && args[1] == :integer_id
+          args[1] = :gid
+          opts = args.extract_options!
+          opts[:null] = false
+          args << opts
+        end
+
         super(*args).tap do
           opts = args.extract_options!
           att = config[:attributes][args[0]]
@@ -320,6 +353,7 @@ module GraphitiGql
     description: 'Datetime with milliseconds'
   }
 
+  # Support ranges
   [:string, :integer, :float, :datetime, :precise_datetime].each do |kind|
     duped_hash = Graphiti::Util::Hash.deep_dup(Graphiti::Types[:hash])
     type = Graphiti::Types[:"#{kind}_range"] = duped_hash
@@ -334,6 +368,29 @@ module GraphitiGql
     }
   end
 
+  # Support gid
+  gid_going_out = ->(id) {
+    resource.gid(id)
+  }
+
+  gid_coming_in = definition.constructor do |input|
+    if defined?(ApplicationResource)
+      ApplicationResource.deserialize_gid(input)
+    else
+      Graphiti::Resource.deserialize_gid(input)
+    end
+  end
+
+  # Register it with Graphiti
+  Graphiti::Types[:gid] = {
+    params: gid_coming_in,
+    read: gid_going_out,
+    write: gid_coming_in,
+    kind: 'scalar',
+    canonical_name: :gid,
+    description: 'Globally-unique identifier',
+  }
+
   module ActiveRecordAdapterExtras
     extend ActiveSupport::Concern
 
@@ -344,6 +401,8 @@ module GraphitiGql
       alias_method :filter_precise_datetime_gte, :filter_gte
       alias_method :filter_precise_datetime_eq, :filter_eq
       alias_method :filter_precise_datetime_not_eq, :filter_not_eq
+      alias_method :filter_gid_eq, :filter_eq
+      alias_method :filter_gid_not_eq, :filter_not_eq
     end
 
     # TODO: integration specs mysql vs postgres for case sensitivity
@@ -393,11 +452,14 @@ module GraphitiGql
     class << self
       alias :old_default_operators :default_operators
       def default_operators
-        old_default_operators.merge({
-          precise_datetime: numerical_operators,
+        ops = old_default_operators.merge({
+          precise_datetime: numerical_operators - [:not_eq],
           string_enum: [:eq, :not_eq],
           integer_enum: [:eq, :not_eq],
+          gid: [:eq, :not_eq]
         })
+        ops[:datetime] = ops[:datetime] - [:not_eq]
+        ops
       end
     end
   end

@@ -141,6 +141,17 @@ module GraphitiGql
           klass = Class.new(Schema.base_object)
         end
 
+        klass.define_method :resource do
+          return @resource if @resource
+          resource = object.instance_variable_get(:@__graphiti_resource)
+          resource_class = resource.class
+          if resource_class.polymorphic? && !resource_class.polymorphic_child?
+            resource_class = resource_class.resource_for_model(object)
+          end
+          @resource = resource_class
+          resource_class
+        end
+
         klass
       end
 

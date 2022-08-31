@@ -1,6 +1,10 @@
 module GraphitiGql
   module Loaders
-    class FakeRecord < Struct.new(:id, :type)
+    class FakeRecord < Struct.new(:id, :type, :graphiti_resource)
+      def initialize(*args)
+        super
+        @__graphiti_resource = graphiti_resource
+      end
     end
 
     class BelongsTo < GraphQL::Batch::Loader
@@ -21,11 +25,11 @@ module GraphitiGql
             ids.each do |id|
               child = @sideload.children.values.find { |c| c.group_name == id[:type].to_sym }
               type = Schema::Registry.instance.get(child.resource.class, interface: false)[:type]
-              fulfill(id, FakeRecord.new(id[:id], type))
+              fulfill(id, FakeRecord.new(id[:id], type, child.resource))
             end
           else
             type = Schema::Registry.instance.get(@sideload.resource.class)[:type]
-            ids.each { |id| fulfill(id, FakeRecord.new(id, type)) }
+            ids.each { |id| fulfill(id, FakeRecord.new(id, type, @sideload.resource)) }
           end
           return
         end
@@ -40,9 +44,10 @@ module GraphitiGql
           payload.each_pair do |key, value|
             params = { filter: {} }
             klass = @sideload.children.values.find { |c| c.group_name == key.to_sym }
-            params = {
-              filter: { id: { eq: value.join(",") } }
-            }
+            filter_ids = value.map { |id| @sideload.resource.class.gid(id.to_s) }
+            params = @params.merge({
+              filter: { id: { eq: filter_ids } }
+            })
 
             futures << Concurrent::Future.execute do
                { type: key, data: klass.resource.class.all(params).data }
@@ -55,9 +60,10 @@ module GraphitiGql
           end
         else
           resource = Schema.registry.get(@sideload.resource.class)[:resource]
-          params = {}
+          params = @params.deep_dup
           unless resource.singular
-            params[:filter] = {id: { eq: ids.join(",") } }
+            filter_ids = ids.map { |id| @sideload.resource.class.gid(id.to_s) }
+            params[:filter] = {id: { eq: filter_ids } }
           end
           records = resource.all(params).data
           if resource.singular

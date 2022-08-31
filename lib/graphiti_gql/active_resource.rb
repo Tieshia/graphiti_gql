@@ -37,18 +37,20 @@ module GraphitiGql
       def edge(name, node_id)
         found = @edges[name].empty? ? nil : @edges[name]
         if found && node_id
-          found.find { |f| f.instance_variable_get(:@node_id) == node_id.to_s }
+          found.find do |f|
+            gql_node_id = f.instance_variable_get(:@node_id)
+            gql_node_id == node_id ||
+              gql_node_id == node_id.to_s ||
+              gql_node_id == @resource.gid(node_id)
+          end
         else
           found
         end
       end
 
-      def decoded_id
-        Base64.decode64(self.id)
-      end
-
-      def int_id
-        decoded_id.to_i
+      def _id
+        deserialized = @resource.deserialize_gid(id)
+        deserialized.to_i.to_s == deserialized ? deserialized.to_i : deserialized
       end
     end
 
@@ -77,7 +79,7 @@ module GraphitiGql
           data # fire query
           Node.new(underscore(data[data.keys.first]), @resource)
         else
-          nodes.find { |n| n.id == id.to_s }
+          nodes.find { |n| n.id == id.to_s || n.id == @resource.gid(id) }
         end
       end
 

@@ -24,6 +24,10 @@ def schema!
   GraphitiGql.schema!
 end
 
+def gid(*ids)
+  resource.gid(*ids)
+end
+
 # so tests can create/update resource classes
 def reload_resources
   _resources ||= Graphiti.resources.reject(&:abstract_class?)

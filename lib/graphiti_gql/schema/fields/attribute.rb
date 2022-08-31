@@ -37,7 +37,16 @@ module GraphitiGql
               end
             end
             return if value.nil?
-            Graphiti::Types[_config[:type]][:read].call(value)
+
+            caster = Graphiti::Types[_config[:type]][:read]
+            # Dry::Types can't be instance_exec'd
+            # This dependency has probably served it's purpose and can be
+            # refactored away
+            if caster.is_a?(Proc)
+              instance_exec(value, &caster)
+            else
+              caster.call(value)
+            end
           end
         end
 
@@ -51,7 +60,6 @@ module GraphitiGql
             if !field_type
               canonical_graphiti_type = Graphiti::Types.name_for(@config[:type])
               field_type = GQL_TYPE_MAP[canonical_graphiti_type.to_sym]
-              field_type = String if @name == :id
             end
             field_type = [field_type] if @config[:type].to_s.starts_with?("array_of")
             field_type

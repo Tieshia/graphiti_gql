@@ -74,6 +74,9 @@ module GraphitiGql
       resource.gql(params.merge(fields: fields), ctx, q, opts)
     end
 
+    def gid(*ids)
+      resource.gid(*ids)
+    end
 
     def run
       lambda do

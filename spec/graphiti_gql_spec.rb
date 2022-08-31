@@ -29,7 +29,7 @@ RSpec.describe GraphitiGql do
       it "works" do
         json = run(%|
           query {
-            employee(id: "2") {
+            employee(id: "#{gid('2')}") {
               firstName
             }
           }
@@ -187,7 +187,7 @@ RSpec.describe GraphitiGql do
         it "works" do
           json = run(%(
             query {
-              exemplaryEmployee(id: "1") {
+              exemplaryEmployee(id: "#{gid('1')}") {
                 firstName
               }
             }
@@ -291,7 +291,9 @@ RSpec.describe GraphitiGql do
           end
 
           it "does not try to filter on foreign key" do
-            expect(resource).to receive(:all).with({}).and_call_original
+            expect(resource).to receive(:all)
+              .with({})
+              .and_call_original
             json = run(%(
               query {
                 positions {
@@ -359,7 +361,7 @@ RSpec.describe GraphitiGql do
           employees: {
             nodes: [
               {
-                id: "1",
+                id: gid(employee1.id),
                 firstName: "Stephen",
                 active: true,
                 age: 60,
@@ -375,7 +377,7 @@ RSpec.describe GraphitiGql do
                 objectArray: [{foo: "bar"}, {baz: "bazoo"}]
               },
               {
-                id: "2",
+                id: gid(employee2.id),
                 firstName: "Agatha",
                 active: true,
                 age: 70,
@@ -580,7 +582,7 @@ RSpec.describe GraphitiGql do
                   }
                 }
               |)
-              expect(json[:employees][:nodes][0][:id]).to eq(null_name.id.to_s)
+              expect(json[:employees][:nodes][0][:id]).to eq(gid(null_name.id))
             end
           end
 
@@ -648,14 +650,14 @@ RSpec.describe GraphitiGql do
                   {
                     positions: {
                       nodes: [
-                        { id: "1" }
+                        { id: position_resource.gid('1') }
                       ]
                     }
                   },
                   {
                     positions: {
                       nodes: [
-                        { id: "2" }
+                        { id: position_resource.gid('2') }
                       ]
                     }
                   }
@@ -669,7 +671,7 @@ RSpec.describe GraphitiGql do
           it "is a passed as a string" do
             json = run(%|
               query {
-                employees(filter: { id: { eq: "2" } }) {
+                employees(filter: { id: { eq: "#{gid('2')}" } }) {
                   nodes {
                     firstName
                   }
@@ -727,7 +729,7 @@ RSpec.describe GraphitiGql do
                 }
               |)
               expect(json[:errors][0][:message])
-                .to eq("Argument 'eq' on InputObject 'POROEmployeeFilterFilterid' has an invalid value ([1, 3]). Expected type 'String'.")
+                .to eq("Argument 'eq' on InputObject 'POROEmployeeFilterFilterid' has an invalid value ([1, 3]). Expected type 'ID'.")
             end
           end
         end
@@ -767,7 +769,7 @@ RSpec.describe GraphitiGql do
                   }
                 |)
                 expect(json)  
-                  .to eq(employees: { nodes: [{ id: "1" }, { id: "2" }] })
+                  .to eq(employees: { nodes: [{ id: gid("1") }, { id: gid("2") }] })
               end
             end
 
@@ -796,7 +798,7 @@ RSpec.describe GraphitiGql do
                   }
                 |)
                 expect(json)  
-                  .to eq(employees: { nodes: [{ id: "1" }, { id: "2" }] })
+                  .to eq(employees: { nodes: [{ id: gid("1") }, { id: gid("2") }] })
               end
             end
           end
@@ -1129,7 +1131,7 @@ RSpec.describe GraphitiGql do
               context "on a has_many" do
                 before do
                   resource.filter :foo, :string, required: false
-                  position_resource.filter :employee_id, :integer, required: true
+                  position_resource.filter :employee_id, :gid, required: true
                   schema!
                 end
 
@@ -1407,7 +1409,7 @@ RSpec.describe GraphitiGql do
             expect(json).to eq({
               employees: {
                 nodes: [{
-                  id: "999",
+                  id: gid("999"),
                   firstName: "custom!"
                 }]
               }
@@ -1457,7 +1459,7 @@ RSpec.describe GraphitiGql do
             |)
             expect(json[:employees]).to eq({
               nodes: [{
-                id: employee2.id.to_s,
+                id: gid(employee2.id),
                 firstName: "Agatha",
                 positions: {
                   nodes: [{
@@ -1788,7 +1790,7 @@ RSpec.describe GraphitiGql do
             it "works" do
               json = run(%|
                 query {
-                  employee(id: "#{employee1.id}") {
+                  employee(id: "#{gid(employee1.id)}") {
                     firstName
                     positions(first: 1) {
                       pageInfo {
@@ -1812,7 +1814,7 @@ RSpec.describe GraphitiGql do
               cursor = edges[0][:cursor]
               json = run(%|
                 query {
-                  employee(id: "#{employee1.id}") {
+                  employee(id: "#{gid(employee1.id)}") {
                     firstName
                     positions(first: 1, after: "#{cursor}") {
                       edges {
@@ -2454,7 +2456,7 @@ RSpec.describe GraphitiGql do
                 employees {
                   nodes {
                     firstName
-                    positions(filter: { employee_id: { eq: "123" } }) {
+                    positions(filter: { employee_id: { eq: "#{gid('123')}" } }) {
                       nodes {
                         title
                       }
@@ -2471,7 +2473,7 @@ RSpec.describe GraphitiGql do
             before do
               position2.update_attributes(emp_id: employee2.id)
               position_resource
-                .attribute :employee_id, :integer, alias: :emp_id
+                .attribute :employee_id, :gid, alias: :emp_id
               schema!
             end
 
@@ -2496,7 +2498,7 @@ RSpec.describe GraphitiGql do
                     {
                       positions: {
                         nodes: [
-                          { id: position2.id.to_s }
+                          { id: position_resource.gid(position2.id) }
                         ]
                       }
                     }
@@ -2653,7 +2655,7 @@ RSpec.describe GraphitiGql do
             let!(:pos3) { PORO::Position.create(emp_id: employee2.id, title: "c") }
 
             before do
-              position_resource.filter :emp_id, :integer
+              position_resource.filter :emp_id, :gid
               resource.has_many :positions, foreign_key: :emp_id, resource: position_resource
               schema!
             end
@@ -2741,7 +2743,7 @@ RSpec.describe GraphitiGql do
               it "works" do
                 json = run(%|
                   query {
-                    employees(filter: { id: { eq: "#{employee3.id}" } }) {
+                    employees(filter: { id: { eq: "#{gid(employee3.id)}" } }) {
                       nodes {
                         firstName
                         positions {
@@ -2771,7 +2773,7 @@ RSpec.describe GraphitiGql do
                   ).and_call_original
                 json = run(%|
                   query {
-                    employee(id: "#{employee3.id}") {
+                    employee(id: "#{gid(employee3.id)}") {
                       firstName
                       positions {
                         stats {
@@ -2817,9 +2819,9 @@ RSpec.describe GraphitiGql do
                     expect(json).to eq({
                       employees: {
                         nodes: [
-                          { id: "1", positions: { stats: { total: { count: 1.0 } } } },
-                          { id: "2", positions: { stats: { total: { count: 5.0 } } } },
-                          { id: "3", positions: { stats: { total: { count: 2.0 } } } }
+                          { id: gid("1"), positions: { stats: { total: { count: 1.0 } } } },
+                          { id: gid("2"), positions: { stats: { total: { count: 5.0 } } } },
+                          { id: gid("3"), positions: { stats: { total: { count: 2.0 } } } }
                         ]
                       }
                     })
@@ -2883,9 +2885,9 @@ RSpec.describe GraphitiGql do
                     expect(json).to eq({
                       employees: {
                         nodes: [
-                          { id: "1", teams: { stats: { total: { count: 1.0 } } } },
-                          { id: "2", teams: { stats: { total: { count: 4.0 } } } },
-                          { id: "3", teams: { stats: { total: { count: 2.0 } } } }
+                          { id: gid("1"), teams: { stats: { total: { count: 1.0 } } } },
+                          { id: gid("2"), teams: { stats: { total: { count: 4.0 } } } },
+                          { id: gid("3"), teams: { stats: { total: { count: 2.0 } } } }
                         ]
                       }
                     })
@@ -3003,7 +3005,7 @@ RSpec.describe GraphitiGql do
               it "does not query for nil" do
                 expect(PORO::EmployeeResource)
                   .to receive(:all)
-                  .with(hash_including(filter: { id: { eq: "2" } }))
+                  .with(hash_including(filter: { id: { eq: [gid(2)] } }))
                   .and_call_original
                 json = run(%|
                   query {
@@ -3128,12 +3130,12 @@ RSpec.describe GraphitiGql do
                   nodes: [
                     {
                       employee: {
-                        id: employee2.id.to_s
+                        id: gid(employee2.id)
                       }
                     },
                     {
                       employee: {
-                        id: "87"
+                        id: gid("87")
                       }
                     }
                   ]
@@ -3167,7 +3169,7 @@ RSpec.describe GraphitiGql do
                   nodes: [
                     {
                       employee: {
-                        id: "87"
+                        id: gid("87")
                       }
                     }
                   ]
@@ -3193,7 +3195,7 @@ RSpec.describe GraphitiGql do
               expect(json).to eq({
                 positions: {
                   nodes: [
-                    { employee: { id: "2", __typename: "POROEmployee" } }
+                    { employee: { id: gid("2"), __typename: "POROEmployee" } }
                   ]
                 }
               })
@@ -3243,7 +3245,7 @@ RSpec.describe GraphitiGql do
                       },
                       {
                         employee: {
-                          id: "87"
+                          id: gid("87")
                         }
                       }
                     ]
@@ -3324,19 +3326,19 @@ RSpec.describe GraphitiGql do
               creditCards: {
                 nodes: [
                   {
-                    id: "1",
+                    id: PORO::VisaResource.gid("1"),
                     __typename: "POROVisa",
                     number: 1,
                     description: "visa description"
                   },
                   {
-                    id: "2",
+                    id: PORO::GoldVisaResource.gid("2"),
                     __typename: "Goldies",
                     number: 2,
                     description: "visa description"
                   },
                   {
-                    id: "3",
+                    id: PORO::MastercardResource.gid("3"),
                     __typename: "POROMastercard",
                     number: 3,
                     description: "mastercard description"
@@ -3804,7 +3806,7 @@ RSpec.describe GraphitiGql do
                     it "still works" do
                       json = run(%(
                         query {
-                          position(id: "#{position.id}") {
+                          position(id: "#{position_resource.gid(position.id)}") {
                             employee {
                               firstName
                               creditCards {
@@ -3841,7 +3843,7 @@ RSpec.describe GraphitiGql do
                                   visaRewards: {
                                     nodes: [
                                       {
-                                        id: reward1.id.to_s,
+                                        id: PORO::VisaRewardResource.gid(reward1.id),
                                         points: 5,
                                         rewardTransactions: {
                                           nodes: [
@@ -3851,7 +3853,7 @@ RSpec.describe GraphitiGql do
                                         }
                                       },
                                       {
-                                        id: reward2.id.to_s,
+                                        id: PORO::VisaRewardResource.gid(reward2.id.to_s),
                                         points: 10,
                                         rewardTransactions: {nodes: []}
                                       }
@@ -3903,7 +3905,7 @@ RSpec.describe GraphitiGql do
                             __typename: "POROMastercard",
                             mastercardMiles: {
                               nodes: [{
-                                id: mile.id.to_s,
+                                id: PORO::MastercardMileResource.gid(mile.id),
                                 amount: 100
                               }]
                             }
@@ -3970,7 +3972,7 @@ RSpec.describe GraphitiGql do
               employees: {
                 nodes: [
                   {
-                    id: "1",
+                    id: gid("1"),
                     teams: {
                       nodes: [
                         { name: "Stephen's First Team" },
@@ -3979,7 +3981,7 @@ RSpec.describe GraphitiGql do
                     }
                   },
                   {
-                    id: "2",
+                    id: gid("2"),
                     teams: {
                       nodes: [
                         { name: "Agatha's Team" }
@@ -4067,9 +4069,9 @@ RSpec.describe GraphitiGql do
 
             it "is honored" do
               nodes = json[:employees][:nodes][0][:teams][:nodes]
-              expect(nodes.map { |n| n[:id].to_i }).to eq([
-                team2.id,
-                team1.id
+              expect(nodes.map { |n| n[:id] }).to eq([
+                PORO::TeamResource.gid(team2.id),
+                PORO::TeamResource.gid(team1.id)
               ])
             end
 
@@ -4252,16 +4254,16 @@ RSpec.describe GraphitiGql do
               notes: {
                 nodes: [
                   {
-                    id: note1.id.to_s,
+                    id: PORO::NoteResource.gid(note1.id),
                     notable: {
-                      id: employee2.id.to_s,
+                      id: gid(employee2.id),
                       __typename: "POROEmployee"
                     }
                   },
                   {
-                    id: note2.id.to_s,
+                    id: PORO::NoteResource.gid(note2.id),
                     notable: {
-                      id: team.id.to_s,
+                      id: PORO::TeamResource.gid(team.id),
                       __typename: "POROTeam"
                     }
                   }
@@ -4292,12 +4294,12 @@ RSpec.describe GraphitiGql do
               expect(json).to eq({
                 notes: {
                   nodes: [
-                    { id: "1", notable: nil },
+                    { id: PORO::NoteResource.gid("1"), notable: nil },
                     {
-                      id: "2",
+                      id: PORO::NoteResource.gid("2"),
                       notable: {
                         __typename: "POROTeam",
-                        id: "1"
+                        id: PORO::TeamResource.gid("1")
                       }
                     }
                   ]
@@ -4360,19 +4362,19 @@ RSpec.describe GraphitiGql do
               expect(json).to eq({
                 notes: {
                   nodes: [
-                    { id: "1", notable: nil },
-                    { id: "2", notable: nil },
+                    { id: PORO::NoteResource.gid("1"), notable: nil },
+                    { id: PORO::NoteResource.gid("2"), notable: nil },
                     {
-                      id: "3",
+                      id: PORO::NoteResource.gid("3"),
                       notable: {
-                        id: "1",
+                        id: gid("1"),
                         __typename: "POROEmployee"
                       }
                     },
                     {
-                      id: "4",
+                      id: PORO::NoteResource.gid("4"),
                       notable: {
-                        id: "2",
+                        id: gid("2"),
                         __typename: "POROEmployee"
                       }
                     }
@@ -4423,16 +4425,16 @@ RSpec.describe GraphitiGql do
                 notes: {
                   nodes: [
                     {
-                      id: "1",
+                      id: PORO::NoteResource.gid("1"),
                       notable: {
-                        id: "1",
+                        id: gid("1"),
                         __typename: "POROEmployee"
                       }
                     },
                     {
-                      id: "2",
+                      id: PORO::NoteResource.gid("2"),
                       notable: {
-                        id: "2",
+                        id: gid("2"),
                         __typename: "POROEmployee"
                       }
                     }
@@ -4485,16 +4487,16 @@ RSpec.describe GraphitiGql do
                 notes: {
                   nodes: [
                     {
-                      id: "1",
+                      id: PORO::NoteResource.gid("1"),
                       notable: {
-                        id: "1",
+                        id: gid("1"),
                         __typename: "POROEmployee"
                       }
                     },
                     {
-                      id: "2",
+                      id: PORO::NoteResource.gid("2"),
                       notable: {
-                        id: "2",
+                        id: gid("2"),
                         __typename: "POROEmployee"
                       }
                     }
@@ -4529,16 +4531,16 @@ RSpec.describe GraphitiGql do
                 notes: {
                   nodes: [
                     {
-                      id: note1.id.to_s,
+                      id: PORO::NoteResource.gid(note1.id),
                       notable: {
-                        id: employee2.id.to_s,
+                        id: gid(employee2.id),
                         firstName: "Agatha"
                       }
                     },
                     {
-                      id: note2.id.to_s,
+                      id: PORO::NoteResource.gid(note2.id),
                       notable: {
-                        id: team.id.to_s,
+                        id: PORO::TeamResource.gid(team.id),
                         __typename: "POROTeam",
                         name: "A Team"
                       }
@@ -4850,8 +4852,8 @@ RSpec.describe GraphitiGql do
 
             it "is honored" do
               nodes = json[:employees][:nodes][1][:notes][:nodes]
-              expect(nodes.map { |n| n[:id].to_i })
-                .to eq([note3.id, note2.id, note1.id])
+              expect(nodes.map { |n| n[:id] })
+                .to eq(PORO::NoteResource.gid(note3.id, note2.id, note1.id))
             end
 
             it "yields parents correctly" do
@@ -5080,7 +5082,7 @@ RSpec.describe GraphitiGql do
 
           it "automatically limits to single record" do
             node =  json[:employees][:nodes][0]
-            expect(node[:topPosition][:id]).to eq(pos1.id.to_s)
+            expect(node[:topPosition][:id]).to eq(position_resource.gid(pos1.id))
           end
 
           context "when custom params proc" do
@@ -5105,7 +5107,7 @@ RSpec.describe GraphitiGql do
 
             it "is honored" do
               node =  json[:employees][:nodes][0]
-              expect(node[:topPosition][:id]).to eq(pos2.id.to_s)
+              expect(node[:topPosition][:id]).to eq(position_resource.gid(pos2.id))
             end
 
             it "yields parents correctly" do
@@ -5143,7 +5145,7 @@ RSpec.describe GraphitiGql do
           "sort" => [{ "att" => "firstName", "dir" => "desc" }]
         })
         ids = json[:employees][:nodes].map { |n| n[:id] }
-        expect(ids).to eq(["3", "2"])
+        expect(ids).to eq([gid("3"), gid("2")])
       end
     end
 
@@ -5714,7 +5716,7 @@ RSpec.describe GraphitiGql do
           it "works" do
             run(%|
               query {
-                employee(id: "#{employee1.id}") {
+                employee(id: "#{gid(employee1.id)}") {
                   firstName
                   age
                 }

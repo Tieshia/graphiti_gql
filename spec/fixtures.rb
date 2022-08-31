@@ -96,13 +96,9 @@ module PORO
         return records if params[:sort].nil?
 
         params[:sort].reverse_each do |sort|
-          begin
-            records.sort! do |a, b|
-              att = sort.keys[0]
-              a.send(att) <=> b.send(att)
-            end
-          rescue
-            binding.pry
+          records.sort! do |a, b|
+            att = sort.keys[0]
+            a.send(att) <=> b.send(att)
           end
           records = records.reverse if sort.values[0] == :desc
         end
@@ -361,6 +357,8 @@ module PORO
     alias_method :filter_boolean_eq, :filter
     alias_method :filter_hash_eq, :filter
     alias_method :filter_array_eq, :filter
+    alias_method :filter_gid_eq, :filter
+    alias_method :filter_gid_not_eq, :filter
 
     def filter_string_prefix(scope, name, value)
       raise "Not implemented, just used for required filter test"
@@ -452,9 +450,9 @@ module PORO
 
   class TeamResource < ApplicationResource
     attribute :name, :string
-    filter :department_id, :integer
+    filter :department_id, :gid
 
-    filter :employee_id, :integer
+    filter :employee_id, :gid
 
     stat total: [:count] do
       count do |scope, attr|
@@ -583,7 +581,7 @@ module PORO
   end
 
   class PositionResource < ApplicationResource
-    attribute :employee_id, :integer, only: [:filterable]
+    attribute :employee_id, :gid, only: [:filterable]
     attribute :active, :boolean
     attribute :title, :string
     attribute :rank, :integer
@@ -603,13 +601,13 @@ module PORO
   end
 
   class NoteEditResource < ApplicationResource
-    filter :note_id, :integer
+    filter :note_id, :gid
     attribute :modification, :string
   end
 
   class NoteResource < ApplicationResource
     attribute :body, :string
-    filter :notable_id, :integer
+    filter :notable_id, :gid
     filter :notable_type, :string
 
     has_many :edits, resource: PORO::NoteEditResource
@@ -631,7 +629,7 @@ module PORO
 
     attribute :number, :integer
     attribute :description, :string
-    filter :employee_id, :integer
+    filter :employee_id, :gid
 
     has_many :transactions
 
@@ -646,7 +644,7 @@ module PORO
 
   class TransactionResource < ApplicationResource
     attribute :amount, :integer
-    filter :credit_card_id, :integer
+    filter :credit_card_id, :gid
   end
 
   class VisaResource < CreditCardResource
@@ -681,7 +679,7 @@ module PORO
   end
 
   class MastercardMileResource < CreditCardResource
-    filter :mastercard_id, :integer
+    filter :mastercard_id, :gid
     attribute :amount, :integer do
       100
     end
@@ -692,7 +690,7 @@ module PORO
   end
 
   class VisaRewardTransactionResource < ApplicationResource
-    filter :reward_id, :integer
+    filter :reward_id, :gid
     attribute :amount, :integer
 
     def base_scope
@@ -701,7 +699,7 @@ module PORO
   end
 
   class VisaRewardResource < ApplicationResource
-    filter :visa_id, :integer
+    filter :visa_id, :gid
     attribute :points, :integer
 
     def base_scope

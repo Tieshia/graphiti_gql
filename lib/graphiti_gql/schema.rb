@@ -33,6 +33,7 @@ module GraphitiGql
       integer_id: String,
       string: String,
       uuid: String,
+      gid: GraphQL::Types::ID,
       integer: Integer,
       big_integer: GraphQL::Types::BigInt,
       float: Float,
@@ -68,7 +69,9 @@ module GraphitiGql
     end
 
     def self.base_object
+      return @base_object if @base_object
       klass = Class.new(GraphQL::Schema::Object)
+
       # TODO make this config maybe
       if defined?(ActionView)
         klass.send(:include, ActionView::Helpers::TranslationHelper)
@@ -79,6 +82,7 @@ module GraphitiGql
           end
         end
       end
+      @base_object = klass
       klass
     end
 

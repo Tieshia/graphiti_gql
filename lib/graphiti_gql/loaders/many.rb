@@ -15,7 +15,7 @@ module GraphitiGql
 
       def initialize(sideload, params)
         @sideload = sideload
-        @params = params
+        @params = params.merge(typecast_filters: false)
       end
 
       def perform(parent_records)
@@ -34,6 +34,7 @@ module GraphitiGql
             pk
           end
         end
+        ids.compact!
 
         build_params(ids, parent_records)
         resource = Schema.registry.get(@sideload.resource.class)[:resource]
@@ -53,13 +54,16 @@ module GraphitiGql
         if @sideload.polymorphic_as
           type = ids[0][:"#{@sideload.polymorphic_as}_type"]
           foreign_keys = ids.map { |id| id[@sideload.foreign_key] }
+          foreign_keys.map! { |id| @sideload.parent_resource.class.gid(id) }
           @params[:filter][:"#{@sideload.polymorphic_as}_type"] = type
-          @params[:filter][@sideload.foreign_key] = foreign_keys.join(",")
+          @params[:filter][@sideload.foreign_key] = foreign_keys
         elsif @sideload.type == :many_to_many
+          filter_ids = ids.map { |id| @sideload.parent_resource.class.gid(id) }
           fk = @sideload.foreign_key.values.first
-          @params[:filter].merge!(fk => { eq: ids.join(",") })
+          @params[:filter].merge!(fk => { eq: filter_ids })
         elsif !@sideload.parent_resource.class.singular
-          @params[:filter].merge!(@sideload.foreign_key => { eq: ids.join(",") })
+          filter_ids = ids.map { |id| @sideload.parent_resource.class.gid(id) }
+          @params[:filter].merge!(@sideload.foreign_key => { eq: filter_ids })
         end
 
         if @params[:stats]

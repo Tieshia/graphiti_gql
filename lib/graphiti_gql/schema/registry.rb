@@ -60,8 +60,7 @@ module GraphitiGql
       private
 
       def key_for_resource(resource)
-        resource.graphql_name ||
-          resource.name.gsub('Resource', '').gsub('::', '')
+        resource.graphql_name
       end
     end
   end

@@ -12,7 +12,7 @@ module GraphitiGql
             null: true,
             extras: [:lookahead]
           unless @registered[:resource].singular
-            field.argument(:id, String, required: true)
+            field.argument(:id, GraphQL::Types::ID, required: true)
           end
           _registered = @registered
           query.define_method name do |**arguments|

@@ -77,7 +77,6 @@ module GraphitiGql
             canonical_graphiti_type = Graphiti::Types
               .name_for(filter_config[:type])
             type = GQL_TYPE_MAP[canonical_graphiti_type]
-            type = String if filter_name == :id
           end
 
           if (allowlist = filter_config[:allow])
