@@ -149,6 +149,7 @@ module GraphitiGql
 
       def value_object!
         config[:is_value_object] = true
+        self.graphql_entrypoint = false
         self.adapter = ::Graphiti::Adapters::Null
         config[:filters] = {}
         config[:stats] = {}
@@ -580,12 +581,6 @@ class Graphiti::ValueObjectAssociation
   def resource_class
     @resource_class ||= Graphiti::Util::Class
       .infer_resource_class(@parent_resource_class, name)
-  end
-
-  def build_resource(parent)
-    instance = resource_class.new
-    instance.parent = parent
-    instance
   end
 end
 

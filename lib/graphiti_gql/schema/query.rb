@@ -38,7 +38,7 @@ module GraphitiGql
       end
 
       def add_value_objects
-        registry.resource_types.each do |registered|
+        registry.resource_types(value_objects: false).each do |registered|
           resource, type = registered[:resource], registered[:type]
           ResourceType.add_value_objects(resource, type)
         end

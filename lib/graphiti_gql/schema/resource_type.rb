@@ -6,8 +6,9 @@ module GraphitiGql
 
         definition_methods do
           # Optional: if this method is defined, it overrides `Schema.resolve_type`
-          def resolve_type(object, context)
+          def resolve_type(object, _context)
             return object.type if object.is_a?(Loaders::FakeRecord)
+
             resource = object.instance_variable_get(:@__graphiti_resource)
             Registry.instance.get(resource.class)[:type]
           end
@@ -17,9 +18,8 @@ module GraphitiGql
       def self.add_fields(type, resource, id: true) # id: false for edges
         resource.attributes.each_pair do |name, config|
           next if name == :id && id == false
-          if config[:readable]
-            Fields::Attribute.new(resource, name, config).apply(type)
-          end
+
+          Fields::Attribute.new(resource, name, config).apply(type) if config[:readable]
         end
       end
 
@@ -27,31 +27,31 @@ module GraphitiGql
         resource.config[:value_objects].each_pair do |name, vo_association|
           vo_resource_class = vo_association.resource_class
           value_object_type = Schema.registry.get(vo_resource_class)[:type]
-          if vo_association.array?
-            value_object_type = [value_object_type]
-          end
+          value_object_type = [value_object_type] if vo_association.array?
 
           _array = vo_association.array?
           opts = { null: vo_association.null }
           opts[:deprecation_reason] = vo_association.deprecation_reason if vo_association.deprecation_reason
           type.field name, value_object_type, **opts
           type.define_method name do
-            if (method_name = vo_association.readable)
-              unless vo_association.parent_resource_class.new.send(method_name)
-                raise ::Graphiti::Errors::UnreadableAttribute
-                  .new(vo_association.parent_resource_class, name)
-              end
+            if (method_name = vo_association.readable) && !vo_association.parent_resource_class.new.send(method_name)
+              raise ::Graphiti::Errors::UnreadableAttribute
+                .new(vo_association.parent_resource_class, name)
             end
 
             result = vo_resource_class.all({ parent: object }).to_a
             default_behavior = result == [object]
-            result = result.first if !_array
+            result = result.first unless _array
             if default_behavior
               method_name = vo_association.alias.presence || name
               result = object.send(method_name)
-              if _array && !result.is_a?(Array)
-                raise Graphiti::Errors::InvalidValueObject.new(resource, name, result)
-              end
+              raise Graphiti::Errors::InvalidValueObject.new(resource, name, result) if _array && !result.is_a?(Array)
+            end
+            # For polymorphic value objects
+            if result.is_a?(Array)
+              result.each { |r| r.instance_variable_set(:@__parent, object) }
+            else
+              result.instance_variable_set(:@__parent, object) if result
             end
             result
           end
@@ -59,19 +59,19 @@ module GraphitiGql
       end
 
       def self.add_relationships(resource, type)
-        resource.sideloads.each do |name, sideload|
+        resource.sideloads.each do |_name, sideload|
           next unless sideload.readable?
 
           registered_sl = if sideload.type == :polymorphic_belongs_to
-            PolymorphicBelongsToInterface
-              .new(resource, sideload)
-              .build
-          else
-            Schema.registry.get(sideload.resource.class)
-          end
+                            PolymorphicBelongsToInterface
+                              .new(resource, sideload)
+                              .build
+                          else
+                            Schema.registry.get(sideload.resource.class)
+                          end
           sideload_type = registered_sl[:type]
 
-          if [:has_many, :many_to_many, :has_one].include?(sideload.type)
+          if %i[has_many many_to_many has_one].include?(sideload.type)
             Fields::ToMany.new(sideload, sideload_type).apply(type)
           else
             Fields::ToOne.new(sideload, sideload_type).apply(type)
@@ -86,6 +86,7 @@ module GraphitiGql
 
       def build
         return registry.get(@resource)[:type] if registry.get(@resource)
+
         type = build_base_type
         registry_name = registry.key_for(@resource, interface: poly_parent?)
         type.connection_type_class(build_connection_class)
@@ -108,6 +109,7 @@ module GraphitiGql
         # Define the actual class that implements the interface
         registry.set(@resource, type, interface: false)
         @resource.children.each do |child|
+          registry.get(child)
           if (registered = registry.get(child))
             registered[:type].implements(interface_type)
           else
@@ -128,12 +130,14 @@ module GraphitiGql
           klass.send(:include, BaseInterface)
           ctx = nil
           klass.definition_methods { ctx = self }
-          ctx.define_method :resolve_type do |object, context|
-            resource = object.instance_variable_get(:@__graphiti_resource)
-            registry_name = Registry.instance.key_for(resource.class)
-            if resource.polymorphic?
-              resource = resource.class.resource_for_model(object)
-              registry_name = Registry.instance.key_for(resource)
+          _resource = @resource
+          ctx.define_method :resolve_type do |object, _context|
+            registry_name = Registry.instance.key_for(_resource)
+            if _resource.polymorphic?
+              parent = object.instance_variable_get(:@__parent)
+              # pass parent for polymorphic value objects
+              _resource = _resource.resource_for_model(parent || object)
+              registry_name = Registry.instance.key_for(_resource)
             end
             Registry.instance[registry_name][:type]
           end
@@ -141,8 +145,15 @@ module GraphitiGql
           klass = Class.new(Schema.base_object)
         end
 
+        if @resource.value_object?
+          klass.define_method :parent do
+            object.instance_variable_get(:@__parent)
+          end
+        end
+
         klass.define_method :resource do
           return @resource if @resource
+
           resource = object.instance_variable_get(:@__graphiti_resource)
           resource_class = resource.class
           if resource_class.polymorphic? && !resource_class.polymorphic_child?
@@ -165,7 +176,7 @@ module GraphitiGql
 
       def add_fields(type, resource)
         self.class.add_fields(type, resource)
-      end 
+      end
 
       def build_connection_class
         klass = Class.new(GraphQL::Types::Relay::BaseConnection)

@@ -2404,6 +2404,95 @@ RSpec.describe GraphitiGql do
         end
       end
 
+      context "when requesting polymorphic value objects" do
+        before do
+          employee1.update_attributes(
+            specialty_type: 'design',
+            specialty: {
+              portfolio: 'my portfolio'
+            }
+          )
+          employee2.update_attributes(
+            specialty_type: 'engineering',
+            specialty: {
+              programming_languages: ['ruby', 'python']
+            }
+          )
+        end
+
+        let(:query) do
+          %|
+            query {
+              employees {
+                nodes {
+                  specialty {
+                    ...on POROEngineering {
+                      programmingLanguages
+                    }
+                    ...on PORODesign {
+                      portfolio
+                    }
+                  }
+                }
+              }
+            }
+          |
+        end
+
+        it "works" do
+          json = run(query)
+          expect(json).to eq({
+            employees: {
+              nodes: [
+                { specialty: { portfolio: "my portfolio" } },
+                { specialty: { programmingLanguages: ['ruby', 'python'] } },
+              ]
+            }
+          })
+        end
+
+        context 'when array: true' do
+          before do
+            employee1.update_attributes(
+              specialty: [
+                { portfolio: 'my portfolio 1' },
+                { portfolio: 'my portfolio 2' },
+              ]
+            )
+            employee2.update_attributes(
+              specialty: [
+                { programming_languages: ['ruby', 'python'] },
+                { programming_languages: ['elixir'] }
+              ]
+            )
+            resource.value_object :specialty, array: true
+            schema!
+          end
+
+          it "works" do
+            json = run(query)
+            expect(json).to eq({
+              employees: {
+                nodes: [
+                  {
+                    specialty: [
+                      { portfolio: "my portfolio 1" },
+                      { portfolio: "my portfolio 2"}
+                    ]
+                  },
+                  {
+                    specialty: [
+                      { programmingLanguages: ["ruby", "python"] },
+                      { programmingLanguages: ['elixir'] }
+                    ]
+                  }
+                ]
+              }
+            })
+          end
+        end
+      end
+
       context "when requesting relationships" do
         context "has_many" do
           let!(:position1) { PORO::Position.create(title: "title1", employee_id: employee2.id) }

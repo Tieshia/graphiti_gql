@@ -210,7 +210,9 @@ module PORO
       :other_position_id,
       :other_pos_id,
       :multi_word_stat,
-      :emp_id
+      :emp_id,
+      :specialty,
+      :specialty_type
 
     def initialize(*)
       super
@@ -502,6 +504,33 @@ module PORO
     attribute :to, :string
   end
 
+  class SpecialtyResource < ApplicationResource
+    value_object!
+
+    MAP = {
+      'design' => 'PORO::DesignResource',
+      'engineering' => 'PORO::EngineeringResource',
+    }
+
+    self.polymorphic = MAP.values
+
+    attribute :common, :string do
+      'common specialty'
+    end
+
+    def self.resource_for_model(employee)
+      MAP[employee.specialty_type].constantize
+    end
+  end
+
+  class DesignResource < SpecialtyResource
+    attribute :portfolio, :string
+  end
+
+  class EngineeringResource < SpecialtyResource
+    attribute :programming_languages, :array_of_strings
+  end
+
   class EmployeeResource < ApplicationResource
     self.serializer = PORO::EmployeeSerializer
     attribute :created_at, :datetime do
@@ -531,6 +560,7 @@ module PORO
     many_to_many :teams, foreign_key: {employee_teams: :employee_id}
     polymorphic_has_many :notes, as: :notable
     value_object :working_hours
+    value_object :specialty
 
     attribute :guarded_first_name, :string, filterable: :admin?, sortable: :admin? do
       object.first_name

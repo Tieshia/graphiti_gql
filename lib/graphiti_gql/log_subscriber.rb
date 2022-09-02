@@ -76,8 +76,14 @@ end|, :white, true)
         if response_errors
           Graphiti.info("❌🚨 Response contained errors!", :red, true)
           response_errors.each do |err|
-            Graphiti.info("#{err['extensions']['code']} - #{err['message']}", :red, true)
-            Graphiti.info("#{err['path'].join(".")}", :red, false) if err['path']
+            if err['extensions']
+              Graphiti.info("#{err['extensions']['code']} - #{err['message']}", :red, true)
+            else
+              Graphiti.info(err['message'], :red, true)
+            end
+            if err['path']
+              Graphiti.info("#{err['path'].join(".")}", :red, false) if err['path']
+            end
           end
         end
       else
