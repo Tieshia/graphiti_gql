@@ -1533,6 +1533,14 @@ RSpec.describe GraphitiGql do
             expect(json[:errors][0][:message])
               .to eq("Argument 'att' on InputObject 'POROEmployeeSort' has an invalid value (firstName). Expected type 'POROEmployeeSortAtt!'.")
           end
+
+          it "still sorts internally" do
+            data = resource.all({
+              sort: "first_name"
+            })
+
+            expect(data.map(&:first_name)).to eq(["Agatha", "Stephen"])
+          end
         end
 
         context "when attribute marked schema: true" do
